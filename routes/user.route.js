@@ -2545,6 +2545,17 @@ router.post('/dashboard/feature/investments', async(req,res)=>{
   const inv=await FeatureUserPlans.create({user:u._id,plan:p._id,amount,active:'yes',inv_duration:p.expiration||`${p.duration} Days`,expire_date:exp,activated_at:now,last_growth:now});
 
   await featureNotifyUser(u,'investment','Plan Activated',`You have successfully subscribed to the ${p.name} investment plan.`,'/user/notification.html',{icon:'bell'});
+  try {
+    const { sendPushToUser } = require('../utils/pushNotifications');
+    await sendPushToUser(u, {
+      title: 'Plan Activated',
+      body: `You have successfully subscribed to the ${p.name} investment plan.`,
+      url: '/user/myplans.html',
+      tag: 'plan-activated',
+    });
+  } catch (error) {
+    console.error('Push notification failed:', error.message);
+  }
 
   return featureLocalRedirect(res,'/user/buy-plan.html','Investment successful.',{investment:inv});
 
@@ -2557,7 +2568,7 @@ router.get('/dashboard/feature/myplans', async(req,res)=>{ const u=await feature
  for(const r of rows){ if(r.active==='yes') await featureAccrueInvestment(await FeatureUserPlans.findById(r._id).populate('plan'));
  } const fresh=await FeatureUserPlans.find({user:u._id}).populate('plan').sort({createdAt:-1}).lean();
  const active=fresh.filter(x=>x.active==='yes');
- return res.json({success:true,investments:fresh,totalInvested:active.reduce((s,x)=>s+featureNum(x.amount),0),totalProfit:active.reduce((s,x)=>s+featureNum(x.profit_earned),0),activePlans:active.length});
+ return res.json({success:true,investments:fresh,totalInvested:active.reduce((s,x)=>s+featureNum(x.amount),0),totalProfit:active.reduce((s,x)=>s+featureNum(x.profit_earned),0),activeCount:active.length,activePlans:active.length});
  });
 
 router.get('/dashboard/feature/investments/:id', async(req,res)=>{ const u=await featureGetUser(req);
