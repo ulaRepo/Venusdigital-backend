@@ -8,7 +8,7 @@ router.get('/', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend home page',
-    redirect: `${frontendUrl()}/frontend/index.html`
+    redirect: `${frontendUrl()}/index.html`
   });
 });
 

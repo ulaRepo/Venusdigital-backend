@@ -5,7 +5,7 @@ function normalizeUrl(url) {
   if (!url) return null;
   const value = String(url).trim();
   if (!value) return null;
-  if (value.startsWith('/frontend/')) return value;
+  if (value.startsWith('/')) return value;
   if (value.startsWith('/user/')) return '/frontend' + value;
   if (value.startsWith('/admin/')) return '/frontend' + value;
 
@@ -16,42 +16,42 @@ function normalizeUrl(url) {
   }
 
   const routes = {
-    '/dashboard': '/frontend/user/dashboard.html',
-    '/dashboard/account-settings': '/frontend/user/account-settings.html',
-    '/dashboard/verify-account': '/frontend/user/verify-account.html',
-    '/dashboard/connect-wallet': '/frontend/user/connect-wallet.html',
-    '/dashboard/deposits': '/frontend/user/deposits.html',
-    '/dashboard/withdrawals': '/frontend/user/withdrawals.html',
-    '/dashboard/withdraw-funds': '/frontend/user/withdraw-funds.html',
-    '/dashboard/buy-plan': '/frontend/user/buy-plan.html',
-    '/dashboard/cards': '/frontend/user/cards.html',
-    '/dashboard/portfolio': '/frontend/user/portfolio.html',
-    '/dashboard/copy-trading': '/frontend/user/copy-trading.html',
-    '/dashboard/bot-trading': '/frontend/user/bot-trading.html',
-    '/dashboard/markets': '/frontend/user/markets.html',
-    '/dashboard/mining': '/frontend/user/mining.html',
-    '/dashboard/trade': '/frontend/user/trade.html',
-    '/dashboard/real-estate': '/frontend/user/real-estate.html',
-    '/dashboard/my-loans': '/frontend/user/my-loans.html',
-    '/dashboard/stocks': '/frontend/user/stocks.html',
-    '/dashboard/courses': '/frontend/user/courses.html',
-    '/dashboard/singalssubscriptions': '/frontend/user/singalssubscriptions.html',
-    '/dashboard/accounthistory': '/frontend/user/accounthistory.html',
-    '/dashboard/tradinghistory': '/frontend/user/tradinghistory.html',
-    '/dashboard/transfer-funds': '/frontend/user/transfertouser.html',
-    '/dashboard/support': '/frontend/user/support.html',
-    '/dashboard/notification': '/frontend/user/notification.html',
-    '/dashboard/convert': '/frontend/user/convert.html',
-    '/dashboard/trades/history': '/frontend/user/trades-history.html'
+    '/dashboard': '/user/dashboard.html',
+    '/dashboard/account-settings': '/user/account-settings.html',
+    '/dashboard/verify-account': '/user/verify-account.html',
+    '/dashboard/connect-wallet': '/user/connect-wallet.html',
+    '/dashboard/deposits': '/user/deposits.html',
+    '/dashboard/withdrawals': '/user/withdrawals.html',
+    '/dashboard/withdraw-funds': '/user/withdraw-funds.html',
+    '/dashboard/buy-plan': '/user/buy-plan.html',
+    '/dashboard/cards': '/user/cards.html',
+    '/dashboard/portfolio': '/user/portfolio.html',
+    '/dashboard/copy-trading': '/user/copy-trading.html',
+    '/dashboard/bot-trading': '/user/bot-trading.html',
+    '/dashboard/markets': '/user/markets.html',
+    '/dashboard/mining': '/user/mining.html',
+    '/dashboard/trade': '/user/trade.html',
+    '/dashboard/real-estate': '/user/real-estate.html',
+    '/dashboard/my-loans': '/user/my-loans.html',
+    '/dashboard/stocks': '/user/stocks.html',
+    '/dashboard/courses': '/user/courses.html',
+    '/dashboard/singalssubscriptions': '/user/singalssubscriptions.html',
+    '/dashboard/accounthistory': '/user/accounthistory.html',
+    '/dashboard/tradinghistory': '/user/tradinghistory.html',
+    '/dashboard/transfer-funds': '/user/transfertouser.html',
+    '/dashboard/support': '/user/support.html',
+    '/dashboard/notification': '/user/notification.html',
+    '/dashboard/convert': '/user/convert.html',
+    '/dashboard/trades/history': '/user/trades-history.html'
   };
 
-  if (path === '/user/notification.html') return '/frontend/user/notification.html';
-  if (path === '/user/dashboard.html') return '/frontend/user/dashboard.html';
+  if (path === '/user/notification.html') return '/user/notification.html';
+  if (path === '/user/dashboard.html') return '/user/dashboard.html';
   if (routes[path]) return routes[path];
   if (path.startsWith('/dashboard/')) {
     const tail = path.slice('/dashboard/'.length).replace(/^\/+|\/+$/g, '');
-    if (!tail) return '/frontend/user/dashboard.html';
-    return '/frontend/user/' + tail.replace(/\//g, '-') + '.html';
+    if (!tail) return '/user/dashboard.html';
+    return '/user/' + tail.replace(/\//g, '-') + '.html';
   }
   return value;
 }
@@ -81,7 +81,7 @@ async function notifyUser(user, type, title, message, actionUrl = null, options 
       await sendPushToUser(user, {
         title: notification.title,
         body: notification.message,
-        url: notification.action_url || '/frontend/user/dashboard.html',
+        url: notification.action_url || '/user/dashboard.html',
         tag: options.tag || `digital-grownt-${notification.type}-${notification._id}`,
         icon: options.pushIcon,
         badge: options.pushBadge,

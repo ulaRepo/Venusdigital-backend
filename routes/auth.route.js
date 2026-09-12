@@ -11,7 +11,7 @@ const { getPushConfig, sendPushToUser } = require('../utils/pushNotifications');
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'support@example.com';
 const BRAND_WEBSITE_URL = String(process.env.BRAND_WEBSITE_URL || process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
-const BRAND_LOGO_URL = process.env.BRAND_LOGO_URL || `${String(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/frontend/storage/app/public/photos/DjH2X9jdLXAgNMV4LJyhCMJ34SrNFTDSlxA6Qk7I.png`;
+const BRAND_LOGO_URL = process.env.BRAND_LOGO_URL || `${String(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/storage/app/public/photos/DjH2X9jdLXAgNMV4LJyhCMJ34SrNFTDSlxA6Qk7I.png`;
 const ACCOUNT_TYPES = new Set(['Binary Option Trading', 'Forex Trading', 'Stock Trading', 'CryptoCurrency Investment', 'NFT Trading']);
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
 
@@ -238,7 +238,7 @@ function duplicateFields(error) {
   return fields;
 }
 
-router.get('/login', (req, res) => res.json({ success: true, message: 'Use the frontend login page', redirect: frontendUrl() + '/frontend/login.html' }));
+router.get('/login', (req, res) => res.json({ success: true, message: 'Use the frontend login page', redirect: frontendUrl() + '/login.html' }));
 
 router.post('/login', async (req, res, next) => {
   try {
@@ -256,13 +256,13 @@ router.post('/login', async (req, res, next) => {
 
     const remember = req.body.remember === true || req.body.remember === 'true' || req.body.remember === 'on';
     res.cookie('jwt', createToken(user._id), cookieOptions(remember));
-    return res.json({ success: true, message: 'Login successful', user: safeUser(user), redirect: user.role === 'ADMIN' ? frontendUrl() + '/frontend/admin/manageusers.html' : frontendUrl() + '/frontend/user/dashboard.html' });
+    return res.json({ success: true, message: 'Login successful', user: safeUser(user), redirect: user.role === 'ADMIN' ? frontendUrl() + '/admin/manageusers.html' : frontendUrl() + '/user/dashboard.html' });
   } catch (error) {
     return next(error);
   }
 });
 
-router.get('/register', (req, res) => res.json({ success: true, message: 'Use the frontend register page', redirect: frontendUrl() + '/frontend/register.html' }));
+router.get('/register', (req, res) => res.json({ success: true, message: 'Use the frontend register page', redirect: frontendUrl() + '/register.html' }));
 
 router.post('/register', registerValidator, async (req, res, next) => {
   try {
@@ -312,7 +312,7 @@ router.post('/register', registerValidator, async (req, res, next) => {
         console.error('Welcome email error:', mailError.message);
       }
     }
-    return res.status(201).json({ success: true, message: 'Registered successfully. Please login.', redirect: frontendUrl() + '/frontend/login.html' });
+    return res.status(201).json({ success: true, message: 'Registered successfully. Please login.', redirect: frontendUrl() + '/login.html' });
   } catch (error) {
     if (error && error.code === 11000) return validationResponse(res, duplicateFields(error), 409);
     return next(error);
@@ -339,7 +339,7 @@ router.post('/forgot-password', async (req, res, next) => {
     await user.save({ validateBeforeSave: false });
     if (!resend) return res.status(503).json({ success: false, message: 'Email delivery is not configured' });
 
-    const resetUrl = frontendUrl() + '/frontend/reset-password.html?token=' + encodeURIComponent(raw) + '&email=' + encodeURIComponent(user.email);
+    const resetUrl = frontendUrl() + '/reset-password.html?token=' + encodeURIComponent(raw) + '&email=' + encodeURIComponent(user.email);
     try {
       await resend.emails.send({ from: FROM_EMAIL, to: user.email, subject: 'Reset your Digital-grownt password', html: resetEmailHtml({ name: user.name, resetUrl }) });
     } catch (mailError) {
@@ -374,7 +374,7 @@ router.post('/reset-password', async (req, res, next) => {
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save({ validateBeforeSave: false });
-    return res.json({ success: true, message: 'Password updated. Please log in.', redirect: frontendUrl() + '/frontend/login.html' });
+    return res.json({ success: true, message: 'Password updated. Please log in.', redirect: frontendUrl() + '/login.html' });
   } catch (error) {
     return next(error);
   }

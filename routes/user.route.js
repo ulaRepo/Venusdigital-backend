@@ -2,7 +2,7 @@ const express = require('express');
 const router = require('express').Router();
 
 const User = require('../models/user.model');
-// const Trade = require('../models/livetradingSchema');
+const Trade = require('../models/livetradingSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Deposit = require('../models/depositSchema');
 const AccountHistory = require('../models/AccountHistory');
@@ -294,7 +294,7 @@ router.post('/dashboard/verifyaccount', uploadFields, async (req, res) => {
 
     const { notifyUser } = require('../services/notification.service');
     await notifyUser(user, 'kyc', 'KYC Documents Submitted', 'Your identity verification documents have been submitted and are under review', '/user/notification.html', { icon: 'bell', tag: `kyc-submitted-${user._id}-${Date.now()}` });
-    return res.json({ success: true, message: 'Action Sucessful! Please wait while we verify your application. You will receive an email regarding the status of your application.', application: { _id: application._id }, redirect: `${frontendUrl()}/frontend/user/kyc-form.html?success=1` });
+    return res.json({ success: true, message: 'Action Sucessful! Please wait while we verify your application. You will receive an email regarding the status of your application.', application: { _id: application._id }, redirect: `${frontendUrl()}/user/kyc-form.html?success=1` });
   } catch (error) {
     console.error('verifyaccount error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Could not submit verification application' });
@@ -305,7 +305,7 @@ router.get('/dashboard/verify-account', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend verify account page',
-    redirect: `${frontendUrl()}/frontend/user/verify-account.html`
+    redirect: `${frontendUrl()}/user/verify-account.html`
   });
 });
 
@@ -313,7 +313,7 @@ router.get('/dashboard/kyc-form', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend kyc form page',
-    redirect: `${frontendUrl()}/frontend/user/kyc-form.html`
+    redirect: `${frontendUrl()}/user/kyc-form.html`
   });
 });
 
@@ -321,7 +321,7 @@ router.get('/dashboard/support', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend support page',
-    redirect: `${frontendUrl()}/frontend/user/support.html`
+    redirect: `${frontendUrl()}/user/support.html`
   });
 });
 
@@ -329,7 +329,7 @@ router.get('/dashboard/support/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend support create page',
-    redirect: `${frontendUrl()}/frontend/user/support-create.html`
+    redirect: `${frontendUrl()}/user/support-create.html`
   });
 });
 
@@ -345,7 +345,7 @@ router.get('/dashboard/support/:ticket', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend support ticket page',
-    redirect: `${frontendUrl()}/frontend/user/support.html?ticket=${req.params.ticket}`
+    redirect: `${frontendUrl()}/user/support.html?ticket=${req.params.ticket}`
   });
 });
 
@@ -361,7 +361,7 @@ router.get('/dashboard/account-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend account settings page',
-    redirect: `${frontendUrl()}/frontend/user/account-settings.html`
+    redirect: `${frontendUrl()}/user/account-settings.html`
   });
 });
 
@@ -369,7 +369,7 @@ router.get('/dashboard/notification', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend notification page',
-    redirect: `${frontendUrl()}/frontend/user/notification.html`
+    redirect: `${frontendUrl()}/user/notification.html`
   });
 });
 
@@ -401,7 +401,7 @@ router.get('/dashboard/notifications/unread', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend unread notifications',
-    redirect: `${frontendUrl()}/frontend/user/notification.html`
+    redirect: `${frontendUrl()}/user/notification.html`
   });
 });
 
@@ -409,7 +409,7 @@ router.get('/dashboard/deposits', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend deposits page',
-    redirect: `${frontendUrl()}/frontend/user/deposits.html`
+    redirect: `${frontendUrl()}/user/deposits.html`
   });
 });
 
@@ -417,7 +417,7 @@ router.get('/dashboard/tradinghistory', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend trading history page',
-    redirect: `${frontendUrl()}/frontend/user/tradinghistory.html`
+    redirect: `${frontendUrl()}/user/tradinghistory.html`
   });
 });
 
@@ -425,7 +425,7 @@ router.get('/dashboard/accounthistory', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend account history page',
-    redirect: `${frontendUrl()}/frontend/user/accounthistory.html`
+    redirect: `${frontendUrl()}/user/accounthistory.html`
   });
 });
 
@@ -433,7 +433,7 @@ router.get('/dashboard/withdrawals', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend withdrawals page',
-    redirect: `${frontendUrl()}/frontend/user/withdrawals.html`
+    redirect: `${frontendUrl()}/user/withdrawals.html`
   });
 });
 
@@ -441,7 +441,7 @@ router.get('/dashboard/subtrade', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend subtrade page',
-    redirect: `${frontendUrl()}/frontend/user/subtrade.html`
+    redirect: `${frontendUrl()}/user/subtrade.html`
   });
 });
 
@@ -449,7 +449,7 @@ router.get('/dashboard/buy-plan', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend buy plan page',
-    redirect: `${frontendUrl()}/frontend/user/buy-plan.html`
+    redirect: `${frontendUrl()}/user/buy-plan.html`
   });
 });
 
@@ -457,7 +457,7 @@ router.get('/dashboard/myplans/:sort', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend my plans page',
-    redirect: `${frontendUrl()}/frontend/user/myplans.html?sort=${req.params.sort}`
+    redirect: `${frontendUrl()}/user/myplans.html?sort=${req.params.sort}`
   });
 });
 
@@ -465,7 +465,7 @@ router.get('/dashboard/plan-details/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend plan details page',
-    redirect: `${frontendUrl()}/frontend/user/plan-details.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/user/plan-details.html?id=${req.params.id}`
   });
 });
 
@@ -489,7 +489,7 @@ router.get('/dashboard/trade', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend trade page',
-    redirect: `${frontendUrl()}/frontend/user/trade.html`
+    redirect: `${frontendUrl()}/user/trade.html`
   });
 });
 
@@ -497,7 +497,7 @@ router.get('/dashboard/trades/history', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend trades history page',
-    redirect: `${frontendUrl()}/frontend/user/trades-history.html`
+    redirect: `${frontendUrl()}/user/trades-history.html`
   });
 });
 
@@ -521,7 +521,7 @@ router.get('/dashboard/trades/assets', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend trades assets page',
-    redirect: `${frontendUrl()}/frontend/user/trades-assets.html`
+    redirect: `${frontendUrl()}/user/trades-assets.html`
   });
 });
 
@@ -529,7 +529,7 @@ router.get('/dashboard/trades/positions', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend trades positions page',
-    redirect: `${frontendUrl()}/frontend/user/trades-positions.html`
+    redirect: `${frontendUrl()}/user/trades-positions.html`
   });
 });
 
@@ -537,7 +537,7 @@ router.get('/dashboard/markets', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend markets page',
-    redirect: `${frontendUrl()}/frontend/user/markets.html`
+    redirect: `${frontendUrl()}/user/markets.html`
   });
 });
 
@@ -545,7 +545,7 @@ router.get('/dashboard/trades/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend trade details page',
-    redirect: `${frontendUrl()}/frontend/user/trade-details.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/user/trade-details.html?id=${req.params.id}`
   });
 });
 
@@ -554,7 +554,7 @@ router.get('/dashboard/stocks', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend stocks page',
-    redirect: `${frontendUrl()}/frontend/user/stocks.html`
+    redirect: `${frontendUrl()}/user/stocks.html`
   });
 });
 
@@ -562,7 +562,7 @@ router.get('/dashboard/stocks/portfolio', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend stocks portfolio page',
-    redirect: `${frontendUrl()}/frontend/user/stocks-portfolio.html`
+    redirect: `${frontendUrl()}/user/stocks-portfolio.html`
   });
 });
 
@@ -570,7 +570,7 @@ router.get('/dashboard/stocks/history', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend stocks history page',
-    redirect: `${frontendUrl()}/frontend/user/stocks-history.html`
+    redirect: `${frontendUrl()}/user/stocks-history.html`
   });
 });
 
@@ -578,7 +578,7 @@ router.get('/dashboard/stocks/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend stock details page',
-    redirect: `${frontendUrl()}/frontend/user/stocks.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/user/stocks.html?id=${req.params.id}`
   });
 });
 
@@ -603,7 +603,7 @@ router.get('/dashboard/pre-ipo', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend pre-ipo page',
-    redirect: `${frontendUrl()}/frontend/user/pre-ipo.html`
+    redirect: `${frontendUrl()}/user/pre-ipo.html`
   });
 });
 
@@ -611,7 +611,7 @@ router.get('/dashboard/pre-ipo/holdings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend pre-ipo holdings page',
-    redirect: `${frontendUrl()}/frontend/user/pre-ipo-holdings.html`
+    redirect: `${frontendUrl()}/user/pre-ipo-holdings.html`
   });
 });
 
@@ -619,7 +619,7 @@ router.get('/dashboard/pre-ipo/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend pre-ipo details page',
-    redirect: `${frontendUrl()}/frontend/user/pre-ipo.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/user/pre-ipo.html?id=${req.params.id}`
   });
 });
 
@@ -643,7 +643,7 @@ router.get('/dashboard/cards', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend cards page',
-    redirect: `${frontendUrl()}/frontend/user/cards.html`
+    redirect: `${frontendUrl()}/user/cards.html`
   });
 });
 
@@ -651,7 +651,7 @@ router.get('/dashboard/cards/apply', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend cards apply page',
-    redirect: `${frontendUrl()}/frontend/user/cards-apply.html`
+    redirect: `${frontendUrl()}/user/cards-apply.html`
   });
 });
 
@@ -667,7 +667,7 @@ router.get('/dashboard/cards/:card', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend card details page',
-    redirect: `${frontendUrl()}/frontend/user/cards.html?card=${req.params.card}`
+    redirect: `${frontendUrl()}/user/cards.html?card=${req.params.card}`
   });
 });
 
@@ -676,7 +676,7 @@ router.get('/dashboard/loans/apply', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend loans apply page',
-    redirect: `${frontendUrl()}/frontend/user/loans-apply.html`
+    redirect: `${frontendUrl()}/user/loans-apply.html`
   });
 });
 
@@ -692,7 +692,7 @@ router.get('/dashboard/my-loans', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend my loans page',
-    redirect: `${frontendUrl()}/frontend/user/my-loans.html`
+    redirect: `${frontendUrl()}/user/my-loans.html`
   });
 });
 
@@ -700,7 +700,7 @@ router.get('/dashboard/loans/:loan', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend loan details page',
-    redirect: `${frontendUrl()}/frontend/user/loans.html?loan=${req.params.loan}`
+    redirect: `${frontendUrl()}/user/loans.html?loan=${req.params.loan}`
   });
 });
 
@@ -733,7 +733,7 @@ router.get('/dashboard/real-estate', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend real estate page',
-    redirect: `${frontendUrl()}/frontend/user/real-estate.html`
+    redirect: `${frontendUrl()}/user/real-estate.html`
   });
 });
 
@@ -741,7 +741,7 @@ router.get('/dashboard/my-real-estate', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend my real estate page',
-    redirect: `${frontendUrl()}/frontend/user/my-real-estate.html`
+    redirect: `${frontendUrl()}/user/my-real-estate.html`
   });
 });
 
@@ -757,7 +757,7 @@ router.get('/dashboard/real-estate/cancel/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend real estate cancel page',
-    redirect: `${frontendUrl()}/frontend/user/real-estate.html?cancel=${req.params.id}`
+    redirect: `${frontendUrl()}/user/real-estate.html?cancel=${req.params.id}`
   });
 });
 
@@ -766,7 +766,7 @@ router.get('/dashboard/mining', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend mining page',
-    redirect: `${frontendUrl()}/frontend/user/mining.html`
+    redirect: `${frontendUrl()}/user/mining.html`
   });
 });
 
@@ -782,7 +782,7 @@ router.get('/dashboard/mining/subscription/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend mining subscription page',
-    redirect: `${frontendUrl()}/frontend/user/mining.html?subscription=${req.params.id}`
+    redirect: `${frontendUrl()}/user/mining.html?subscription=${req.params.id}`
   });
 });
 
@@ -808,7 +808,7 @@ router.get('/dashboard/courses', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend courses page',
-    redirect: `${frontendUrl()}/frontend/user/courses.html`
+    redirect: `${frontendUrl()}/user/courses.html`
   });
 });
 
@@ -816,7 +816,7 @@ router.get('/dashboard/course-details/:course/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend course details page',
-    redirect: `${frontendUrl()}/frontend/user/course-details.html?course=${req.params.course}&id=${req.params.id}`
+    redirect: `${frontendUrl()}/user/course-details.html?course=${req.params.course}&id=${req.params.id}`
   });
 });
 
@@ -832,7 +832,7 @@ router.get('/dashboard/my-courses', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend my courses page',
-    redirect: `${frontendUrl()}/frontend/user/my-courses.html`
+    redirect: `${frontendUrl()}/user/my-courses.html`
   });
 });
 
@@ -840,7 +840,7 @@ router.get('/dashboard/learning/:lesson/:course?', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend learning page',
-    redirect: `${frontendUrl()}/frontend/user/learning.html?lesson=${req.params.lesson}${req.params.course ? `&course=${req.params.course}` : ''}`
+    redirect: `${frontendUrl()}/user/learning.html?lesson=${req.params.lesson}${req.params.course ? `&course=${req.params.course}` : ''}`
   });
 });
 
@@ -849,7 +849,7 @@ router.get('/dashboard/nft-gallery', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend nft gallery page',
-    redirect: `${frontendUrl()}/frontend/user/nft-gallery.html`
+    redirect: `${frontendUrl()}/user/nft-gallery.html`
   });
 });
 
@@ -857,7 +857,7 @@ router.get('/dashboard/nfts/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend nft create page',
-    redirect: `${frontendUrl()}/frontend/user/nfts-create.html`
+    redirect: `${frontendUrl()}/user/nfts-create.html`
   });
 });
 
@@ -873,7 +873,7 @@ router.get('/dashboard/nfts/:nft', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend nft details page',
-    redirect: `${frontendUrl()}/frontend/user/nfts.html?nft=${req.params.nft}`
+    redirect: `${frontendUrl()}/user/nfts.html?nft=${req.params.nft}`
   });
 });
 
@@ -881,7 +881,7 @@ router.get('/dashboard/my-nfts', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend my nfts page',
-    redirect: `${frontendUrl()}/frontend/user/my-nfts.html`
+    redirect: `${frontendUrl()}/user/my-nfts.html`
   });
 });
 
@@ -922,7 +922,7 @@ router.get('/dashboard/subscribe-signals', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend subscribe signals page',
-    redirect: `${frontendUrl()}/frontend/user/subscribe-signals.html`
+    redirect: `${frontendUrl()}/user/subscribe-signals.html`
   });
 });
 
@@ -938,7 +938,7 @@ router.get('/dashboard/my-subscriptions', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend my subscriptions page',
-    redirect: `${frontendUrl()}/frontend/user/my-subscriptions.html`
+    redirect: `${frontendUrl()}/user/my-subscriptions.html`
   });
 });
 
@@ -946,7 +946,7 @@ router.get('/dashboard/singalssubscriptions', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend signals subscriptions page',
-    redirect: `${frontendUrl()}/frontend/user/singalssubscriptions.html`
+    redirect: `${frontendUrl()}/user/singalssubscriptions.html`
   });
 });
 
@@ -955,7 +955,7 @@ router.get('/dashboard/copy-trading', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend copy trading page',
-    redirect: `${frontendUrl()}/frontend/user/copy-trading.html`
+    redirect: `${frontendUrl()}/user/copy-trading.html`
   });
 });
 
@@ -963,7 +963,7 @@ router.get('/dashboard/copy-trading/expert/:expert', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend copy trading expert page',
-    redirect: `${frontendUrl()}/frontend/user/copy-trading.html?expert=${req.params.expert}`
+    redirect: `${frontendUrl()}/user/copy-trading.html?expert=${req.params.expert}`
   });
 });
 
@@ -987,7 +987,7 @@ router.get('/dashboard/copy-trading/position/:position', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend copy trading position page',
-    redirect: `${frontendUrl()}/frontend/user/copy-trading.html?position=${req.params.position}`
+    redirect: `${frontendUrl()}/user/copy-trading.html?position=${req.params.position}`
   });
 });
 
@@ -996,7 +996,7 @@ router.get('/dashboard/bot-trading', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend bot trading page',
-    redirect: `${frontendUrl()}/frontend/user/bot-trading.html`
+    redirect: `${frontendUrl()}/user/bot-trading.html`
   });
 });
 
@@ -1004,7 +1004,7 @@ router.get('/dashboard/bot-trading/bot/:bot', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend bot trading bot page',
-    redirect: `${frontendUrl()}/frontend/user/bot-trading.html?bot=${req.params.bot}`
+    redirect: `${frontendUrl()}/user/bot-trading.html?bot=${req.params.bot}`
   });
 });
 
@@ -1028,7 +1028,7 @@ router.get('/dashboard/bot-trading/subscription/:subscription', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend bot trading subscription page',
-    redirect: `${frontendUrl()}/frontend/user/bot-trading.html?subscription=${req.params.subscription}`
+    redirect: `${frontendUrl()}/user/bot-trading.html?subscription=${req.params.subscription}`
   });
 });
 
@@ -1037,7 +1037,7 @@ router.get('/dashboard/portfolio', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend portfolio page',
-    redirect: `${frontendUrl()}/frontend/user/portfolio.html`
+    redirect: `${frontendUrl()}/user/portfolio.html`
   });
 });
 
@@ -1087,7 +1087,7 @@ router.get('/dashboard/get-method/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend get method page',
-    redirect: `${frontendUrl()}/frontend/user/get-method.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/user/get-method.html?id=${req.params.id}`
   });
 });
 
@@ -1097,7 +1097,7 @@ router.post('/dashboard/newdeposit', async (req, res) => {
     const method = String(req.body.payment_method || req.body.paymethd_method || req.body.method || '').trim();
     if (!Number.isFinite(amount) || amount < 10 || !method) return res.status(422).json({ success: false, message: 'Select a payment method and enter a valid deposit amount of at least 10.' });
     req.session.depositDraft = { amount, method, createdAt: Date.now() };
-    return res.json({ success: true, amount, method, redirect: `${frontendUrl()}/frontend/user/payment.html` });
+    return res.json({ success: true, amount, method, redirect: `${frontendUrl()}/user/payment.html` });
   } catch (error) {
     console.error('newdeposit error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Could not start deposit' });
@@ -1138,7 +1138,7 @@ router.get('/dashboard/payment', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend payment page',
-    redirect: `${frontendUrl()}/frontend/user/payment.html`
+    redirect: `${frontendUrl()}/user/payment.html`
   });
 });
 
@@ -1262,7 +1262,7 @@ router.post('/dashboard/savedeposit', depositUpload.single('proof'), async (req,
         return res.json({
             success: true,
             message: 'Account Fund Sucessful! Please wait for system to validate this transaction.',
-            redirect: `${frontendUrl()}/frontend/user/deposits.html?success=deposit`
+            redirect: `${frontendUrl()}/user/deposits.html?success=deposit`
         });
 
     } catch (error) {
@@ -1342,7 +1342,7 @@ router.post('/dashboard/enter-amount', async (req, res) => {
       return res.status(403).json({
         success: false,
         message: 'Your account must be verified before you can make withdrawal.',
-        redirect: `${frontendUrl()}/frontend/user/withdrawals.html?error=unverified`
+        redirect: `${frontendUrl()}/user/withdrawals.html?error=unverified`
       });
     }
 
@@ -1354,7 +1354,7 @@ router.post('/dashboard/enter-amount', async (req, res) => {
       return res.status(422).json({
         success: false,
         message: 'Sorry, your available balance is insufficient for this request.',
-        redirect: `${frontendUrl()}/frontend/user/withdrawals.html?error=insufficient`
+        redirect: `${frontendUrl()}/user/withdrawals.html?error=insufficient`
       });
     }
 
@@ -1366,7 +1366,7 @@ router.post('/dashboard/enter-amount', async (req, res) => {
       return res.status(422).json({
         success: false,
         message: 'Sorry, your available balance is insufficient to cover the withdrawal amount and charges.',
-        redirect: `${frontendUrl()}/frontend/user/withdrawals.html?error=insufficient`
+        redirect: `${frontendUrl()}/user/withdrawals.html?error=insufficient`
       });
     }
 
@@ -1488,7 +1488,7 @@ router.post('/dashboard/enter-amount', async (req, res) => {
       return res.json({
         success: true,
         requiresCodes: true,
-        redirect: `${frontendUrl()}/frontend/user/withdraw-funds.html`
+        redirect: `${frontendUrl()}/user/withdraw-funds.html`
       });
     }
 
@@ -1641,7 +1641,7 @@ router.post('/dashboard/enter-amount', async (req, res) => {
     return res.json({
       success: true,
       message: 'Your withdrawal request has been successfully submitted! Please wait while we process your request.',
-      redirect: `${frontendUrl()}/frontend/user/withdrawals.html?success=withdrawal`
+      redirect: `${frontendUrl()}/user/withdrawals.html?success=withdrawal`
     });
 
   } catch (error) {
@@ -1659,7 +1659,7 @@ router.get('/dashboard/withdraw-funds', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend withdraw funds page',
-    redirect: `${frontendUrl()}/frontend/user/withdraw-funds.html`
+    redirect: `${frontendUrl()}/user/withdraw-funds.html`
   });
 });
 
@@ -1667,7 +1667,7 @@ router.get('/dashboard/getotp', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend get otp page',
-    redirect: `${frontendUrl()}/frontend/user/getotp.html`
+    redirect: `${frontendUrl()}/user/getotp.html`
   });
 });
 
@@ -1918,7 +1918,7 @@ router.post('/dashboard/completewithdrawal', async (req, res) => {
     return res.json({
       success: true,
       message: 'Your withdrawal request has been successfully submitted! Please wait while we process your request.',
-      redirect: `${frontendUrl()}/frontend/user/withdrawals.html?success=withdrawal`
+      redirect: `${frontendUrl()}/user/withdrawals.html?success=withdrawal`
     });
 
   } catch (error) {
@@ -2167,7 +2167,7 @@ router.get('/dashboard/asset-balance', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend asset balance page',
-    redirect: `${frontendUrl()}/frontend/user/asset-balance.html`
+    redirect: `${frontendUrl()}/user/asset-balance.html`
   });
 });
 
@@ -2175,7 +2175,7 @@ router.get('/dashboard/swap-history', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend swap history page',
-    redirect: `${frontendUrl()}/frontend/user/swap-history.html`
+    redirect: `${frontendUrl()}/user/swap-history.html`
   });
 });
 
@@ -2183,7 +2183,7 @@ router.get('/dashboard/asset-price/:base/:quote/:amount', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend asset price page',
-    redirect: `${frontendUrl()}/frontend/user/asset-price.html?base=${req.params.base}&quote=${req.params.quote}&amount=${req.params.amount}`
+    redirect: `${frontendUrl()}/user/asset-price.html?base=${req.params.base}&quote=${req.params.quote}&amount=${req.params.amount}`
   });
 });
 
@@ -2199,7 +2199,7 @@ router.get('/dashboard/balances/:coin', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend balances page',
-    redirect: `${frontendUrl()}/frontend/user/balances.html?coin=${req.params.coin}`
+    redirect: `${frontendUrl()}/user/balances.html?coin=${req.params.coin}`
   });
 });
 
@@ -2207,7 +2207,7 @@ router.get('/dashboard/convert', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend convert page',
-    redirect: `${frontendUrl()}/frontend/user/convert.html`
+    redirect: `${frontendUrl()}/user/convert.html`
   });
 });
 
@@ -2215,7 +2215,7 @@ router.get('/dashboard/convert/price/:from/:to/:amount', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend convert price page',
-    redirect: `${frontendUrl()}/frontend/user/convert.html?from=${req.params.from}&to=${req.params.to}&amount=${req.params.amount}`
+    redirect: `${frontendUrl()}/user/convert.html?from=${req.params.from}&to=${req.params.to}&amount=${req.params.amount}`
   });
 });
 
@@ -2511,7 +2511,7 @@ router.post('/dashboard/feature/wallets/connect', async(req,res)=>{
   const catalog=featureWalletCatalog.find(x=>x.name.toLowerCase()===key);
  const c=await FeatureWalletConnection.create({user_id:u._id,walletName:name,walletKey:key,walletLogo:catalog?.logo||'',status:'active',connectionMethod:'external-wallet'});
 
-  return featureLocalRedirect(res,'/frontend/user/connect-wallet.html',`${name} connected successfully!`,{connection:c});
+  return featureLocalRedirect(res,'/user/connect-wallet.html',`${name} connected successfully!`,{connection:c});
 
 });
 
@@ -2546,7 +2546,7 @@ router.post('/dashboard/feature/investments', async(req,res)=>{
 
   await featureNotifyUser(u,'investment','Plan Activated',`You have successfully subscribed to the ${p.name} investment plan.`,'/user/notification.html',{icon:'bell'});
 
-  return featureLocalRedirect(res,'/frontend/user/buy-plan.html','Investment successful.',{investment:inv});
+  return featureLocalRedirect(res,'/user/buy-plan.html','Investment successful.',{investment:inv});
 
 });
 
@@ -2581,7 +2581,7 @@ router.post('/dashboard/feature/investments/:id/cancel', async(req,res)=>{ const
  await fresh.save();
  u.account_bal=featureNum(u.account_bal)+payout;
  await u.save();
- return featureLocalRedirect(res,'/frontend/user/myplans.html','Investment cancelled successfully.');
+ return featureLocalRedirect(res,'/user/myplans.html','Investment cancelled successfully.');
  });
 
 /* ---------------- USER: cards ---------------- */
@@ -2601,7 +2601,7 @@ router.post('/dashboard/feature/cards', async(req,res)=>{ const u=await featureG
  if(existing)return res.status(409).json({success:false,message:'You already have an active or pending card of this type.'});
  const c=await FeatureCard.create({user_id:u._id,card_type_id:t._id,card_holder:String(req.body.card_holder||u.name),shipping_address:req.body.shipping_address||null,status:'pending'});
  await featureNotifyUser(u,'account','Card Application Submitted',`Your application for a ${t.name} has been submitted and is pending review.`,'/user/notification.html',{icon:'bell'});
- return featureLocalRedirect(res,'/frontend/user/cards.html','Card application submitted. Pending review.',{card:c});
+ return featureLocalRedirect(res,'/user/cards.html','Card application submitted. Pending review.',{card:c});
  });
 
 /* ---------------- USER: copy trading ---------------- */
@@ -2633,7 +2633,7 @@ router.post('/dashboard/feature/copy/start/:id', async(req,res)=>{ const u=await
  await u.save();
  const p=await FeatureCopyPosition.create({user_id:u._id,expert_id:e._id,invested_amount:amount,daily_roi_snapshot:featureNum(e.daily_roi),started_at:now,expires_at:new Date(now.getTime()+featureNum(e.duration_days,30)*86400000),status:'active'});
  await featureNotifyUser(u,'copy_trade','Started Copying FeatureExpert',`You are now copying ${e.name} with $${amount.toFixed(2)} for ${featureNum(e.duration_days,30)} days.`,'/user/notification.html',{icon:'bell'});
- return featureLocalRedirect(res,'/frontend/user/copy-trading.html',`You have started copying ${e.name}!`,{position:p});
+ return featureLocalRedirect(res,'/user/copy-trading.html',`You have started copying ${e.name}!`,{position:p});
  });
 
 router.post('/dashboard/feature/copy/stop/:id', async(req,res)=>{ const u=await featureGetUser(req);
@@ -2649,7 +2649,7 @@ await p.save();
 u.account_bal=featureNum(u.account_bal)+payout;
 await u.save();
 await featureNotifyUser(u,'copy_trade','coptrade stopped',`Your copytrade was stopped and $${payout.toFixed(2)} has been credited to your balance.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/user/copy-trading.html','copytrade stopped');
+return featureLocalRedirect(res,'/user/copy-trading.html','copytrade stopped');
  });
 
 router.get('/dashboard/feature/copy/position/:id', async(req,res)=>{ const u=await featureGetUser(req);
@@ -2690,7 +2690,7 @@ await u.save();
 const roi=featureNum(b.expected_roi||b.daily_roi);
 const s=await FeatureBotSubscription.create({user_id:u._id,bot_id:b._id,invested_amount:amount,daily_roi_snapshot:roi,started_at:now,expires_at:new Date(now.getTime()+featureNum(b.max_duration_days,30)*86400000),status:'active',last_growth:now});
 await featureNotifyUser(u,'trade','Bot Subscription Started',`You subscribed to ${b.name} with $${amount.toFixed(2)}.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/user/bot-trading.html','Bot subscription started.',{subscription:s});
+return featureLocalRedirect(res,'/user/bot-trading.html','Bot subscription started.',{subscription:s});
  });
 
 router.post('/dashboard/feature/bots/stop/:id', async(req,res)=>{ const u=await featureGetUser(req);
@@ -2705,7 +2705,7 @@ await s.save();
 u.account_bal+=payout;
 await u.save();
 await featureNotifyUser(u,'trade','Bot Subscription Stopped',`You stopped your bot subscription. $${payout.toFixed(2)} has been credited to your balance.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/user/bot-trading.html',`Subscription stopped. $${payout.toFixed(2)} credited to your balance.`);
+return featureLocalRedirect(res,'/user/bot-trading.html',`Subscription stopped. $${payout.toFixed(2)} credited to your balance.`);
  });
 
 /* ---------------- USER: mining ---------------- */
@@ -2729,7 +2729,7 @@ u.account_bal-=amount;
 await u.save();
 const s=await FeatureMiningSubscription.create({user_id:u._id,mining_plan_id:p._id,invested_amount:amount,daily_roi_snapshot:featureNum(p.daily_roi_percentage),started_at:now,expires_at:new Date(now.getTime()+featureNum(p.duration_days,30)*86400000),status:'active',last_growth:now});
 await featureNotifyUser(u,'trade','Mining Subscription Started',`You subscribed to ${p.name} with $${amount.toFixed(2)} for ${featureNum(p.duration_days,30)} days.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/user/mining.html','Mining subscription started! Your rig is now active.',{subscription:s});
+return featureLocalRedirect(res,'/user/mining.html','Mining subscription started! Your rig is now active.',{subscription:s});
  });
 
 router.post('/dashboard/feature/mining/stop/:id',async(req,res)=>{const u=await featureGetUser(req);
@@ -2743,7 +2743,7 @@ s.settled_at=new Date();
 await s.save();
 u.account_bal+=payout;
 await u.save();
-return featureLocalRedirect(res,'/frontend/user/mining.html','mining rig stopped successfully');
+return featureLocalRedirect(res,'/user/mining.html','mining rig stopped successfully');
 });
 
 router.get('/dashboard/feature/mining/subscription/:id',async(req,res)=>{const u=await featureGetUser(req);

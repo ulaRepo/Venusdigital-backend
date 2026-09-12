@@ -4,7 +4,7 @@ const router = require('express').Router();
 const User = require('../models/user.model');
 const Deposit = require('../models/depositSchema');
 const Widthdraw = require('../models/widthdrawSchema');
-// const Trade = require('../models/livetradingSchema');
+const Trade = require('../models/livetradingSchema');
 // const Upgrade = require('../models/upgradeSchema');
 const Verify = require('../models/verifySchema');
 // const CopyTrade = require('../models/CopyTrade');
@@ -82,7 +82,7 @@ router.get('/adminlogin/remedylogin', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin login page',
-    redirect: `${frontendUrl()}/frontend/admin/adminlogin.html`
+    redirect: `${frontendUrl()}/admin/adminlogin.html`
   });
 });
 
@@ -113,7 +113,7 @@ router.get('/adminlogin/dashboard', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin dashboard page',
-    redirect: `${frontendUrl()}/frontend/admin/adminDashboard.html`
+    redirect: `${frontendUrl()}/admin/adminDashboard.html`
   });
 });
 
@@ -123,7 +123,7 @@ router.get('/2fa', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin 2fa page',
-    redirect: `${frontendUrl()}/frontend/admin/2fa.html`
+    redirect: `${frontendUrl()}/admin/2fa.html`
   });
 });
 
@@ -141,7 +141,7 @@ router.get('/forgot-password', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin forgot password page',
-    redirect: `${frontendUrl()}/frontend/admin/forgot-password.html`
+    redirect: `${frontendUrl()}/admin/forgot-password.html`
   });
 });
 
@@ -157,7 +157,7 @@ router.get('/reset-password/:email', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin reset password page',
-    redirect: `${frontendUrl()}/frontend/admin/reset-password.html?email=${encodeURIComponent(req.params.email)}`
+    redirect: `${frontendUrl()}/admin/reset-password.html?email=${encodeURIComponent(req.params.email)}`
   });
 });
 
@@ -175,7 +175,7 @@ router.get('/dashboard', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin dashboard page',
-    redirect: `${frontendUrl()}/frontend/admin/adminDashboard.html`
+    redirect: `${frontendUrl()}/admin/adminDashboard.html`
   });
 });
 
@@ -183,7 +183,7 @@ router.get('/dashboard/plans', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin plans page',
-    redirect: `${frontendUrl()}/frontend/admin/plans.html`
+    redirect: `${frontendUrl()}/admin/plans.html`
   });
 });
 
@@ -191,7 +191,7 @@ router.get('/dashboard/new-plan', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin new plan page',
-    redirect: `${frontendUrl()}/frontend/admin/new-plan.html`
+    redirect: `${frontendUrl()}/admin/new-plan.html`
   });
 });
 
@@ -199,7 +199,7 @@ router.get('/dashboard/edit-plan/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin edit plan page',
-    redirect: `${frontendUrl()}/frontend/admin/edit-plan.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/edit-plan.html?id=${req.params.id}`
   });
 });
 
@@ -207,7 +207,7 @@ router.get('/dashboard/manageusers', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage users page',
-    redirect: `${frontendUrl()}/frontend/admin/manageusers.html`
+    redirect: `${frontendUrl()}/admin/manageusers.html`
   });
 });
 
@@ -215,7 +215,7 @@ router.get('/dashboard/manage-crypto-assets', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage crypto assets page',
-    redirect: `${frontendUrl()}/frontend/admin/manage-crypto-assets.html`
+    redirect: `${frontendUrl()}/admin/manage-crypto-assets.html`
   });
 });
 
@@ -223,7 +223,7 @@ router.get('/dashboard/active-investments', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin active investments page',
-    redirect: `${frontendUrl()}/frontend/admin/active-investments.html`
+    redirect: `${frontendUrl()}/admin/active-investments.html`
   });
 });
 
@@ -231,7 +231,7 @@ router.get('/dashboard/calendar', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin calendar page',
-    redirect: `${frontendUrl()}/frontend/admin/calendar.html`
+    redirect: `${frontendUrl()}/admin/calendar.html`
   });
 });
 
@@ -239,7 +239,7 @@ router.get('/dashboard/task', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin task page',
-    redirect: `${frontendUrl()}/frontend/admin/task.html`
+    redirect: `${frontendUrl()}/admin/task.html`
   });
 });
 
@@ -247,7 +247,7 @@ router.get('/dashboard/mtask', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mtask page',
-    redirect: `${frontendUrl()}/frontend/admin/mtask.html`
+    redirect: `${frontendUrl()}/admin/mtask.html`
   });
 });
 
@@ -255,7 +255,7 @@ router.get('/dashboard/viewtask', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin view task page',
-    redirect: `${frontendUrl()}/frontend/admin/viewtask.html`
+    redirect: `${frontendUrl()}/admin/viewtask.html`
   });
 });
 
@@ -263,7 +263,7 @@ router.get('/dashboard/customer', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin customer page',
-    redirect: `${frontendUrl()}/frontend/admin/customer.html`
+    redirect: `${frontendUrl()}/admin/customer.html`
   });
 });
 
@@ -271,7 +271,7 @@ router.get('/dashboard/leads', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin leads page',
-    redirect: `${frontendUrl()}/frontend/admin/leads.html`
+    redirect: `${frontendUrl()}/admin/leads.html`
   });
 });
 
@@ -279,7 +279,7 @@ router.get('/dashboard/leadsassign', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin leads assign page',
-    redirect: `${frontendUrl()}/frontend/admin/leadsassign.html`
+    redirect: `${frontendUrl()}/admin/leadsassign.html`
   });
 });
 
@@ -287,7 +287,7 @@ router.get('/dashboard/user-plans/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin user plans page',
-    redirect: `${frontendUrl()}/frontend/admin/user-plans.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/user-plans.html?id=${req.params.id}`
   });
 });
 
@@ -295,7 +295,7 @@ router.get('/dashboard/email-services', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin email services page',
-    redirect: `${frontendUrl()}/frontend/admin/email-services.html`
+    redirect: `${frontendUrl()}/admin/email-services.html`
   });
 });
 
@@ -303,7 +303,7 @@ router.get('/dashboard/about', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin about page',
-    redirect: `${frontendUrl()}/frontend/admin/about.html`
+    redirect: `${frontendUrl()}/admin/about.html`
   });
 });
 
@@ -311,7 +311,7 @@ router.get('/dashboard/mwithdrawals', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage withdrawals page',
-    redirect: `${frontendUrl()}/frontend/admin/mwithdrawals.html`
+    redirect: `${frontendUrl()}/admin/mwithdrawals.html`
   });
 });
 
@@ -319,7 +319,7 @@ router.get('/dashboard/mdeposits', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage deposits page',
-    redirect: `${frontendUrl()}/frontend/admin/mdeposits.html`
+    redirect: `${frontendUrl()}/admin/mdeposits.html`
   });
 });
 
@@ -327,7 +327,7 @@ router.get('/dashboard/agents', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin agents page',
-    redirect: `${frontendUrl()}/frontend/admin/agents.html`
+    redirect: `${frontendUrl()}/admin/agents.html`
   });
 });
 
@@ -335,7 +335,7 @@ router.get('/dashboard/addmanager', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin add manager page',
-    redirect: `${frontendUrl()}/frontend/admin/addmanager.html`
+    redirect: `${frontendUrl()}/admin/addmanager.html`
   });
 });
 
@@ -343,7 +343,7 @@ router.get('/dashboard/madmin', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage admin page',
-    redirect: `${frontendUrl()}/frontend/admin/madmin.html`
+    redirect: `${frontendUrl()}/admin/madmin.html`
   });
 });
 
@@ -351,7 +351,7 @@ router.get('/dashboard/msubtrade', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage subtrade page',
-    redirect: `${frontendUrl()}/frontend/admin/msubtrade.html`
+    redirect: `${frontendUrl()}/admin/msubtrade.html`
   });
 });
 
@@ -359,7 +359,7 @@ router.get('/dashboard/settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin settings page',
-    redirect: `${frontendUrl()}/frontend/admin/settings.html`
+    redirect: `${frontendUrl()}/admin/settings.html`
   });
 });
 
@@ -367,7 +367,7 @@ router.get('/dashboard/frontpage', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin frontpage page',
-    redirect: `${frontendUrl()}/frontend/admin/frontpage.html`
+    redirect: `${frontendUrl()}/admin/frontpage.html`
   });
 });
 
@@ -375,7 +375,7 @@ router.get('/dashboard/adduser', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin add user page',
-    redirect: `${frontendUrl()}/frontend/admin/adduser.html`
+    redirect: `${frontendUrl()}/admin/adduser.html`
   });
 });
 
@@ -383,7 +383,7 @@ router.get('/dashboard/kyc-applications', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin kyc applications page',
-    redirect: `${frontendUrl()}/frontend/admin/kyc-applications.html`
+    redirect: `${frontendUrl()}/admin/kyc-applications.html`
   });
 });
 
@@ -391,7 +391,7 @@ router.get('/dashboard/kyc-application/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin view kyc application page',
-    redirect: `${frontendUrl()}/frontend/admin/kyc-application.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/kyc-application.html?id=${req.params.id}`
   });
 });
 
@@ -399,7 +399,7 @@ router.get('/dashboard/adminprofile', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin profile page',
-    redirect: `${frontendUrl()}/frontend/admin/adminprofile.html`
+    redirect: `${frontendUrl()}/admin/adminprofile.html`
   });
 });
 
@@ -750,7 +750,7 @@ router.post('/dashboard/sendmailsingle', async (req, res) => {
           <div style="max-width:620px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e7ecef">
             <div style="background:#0052ff;padding:26px;text-align:center"><img src="${process.env.BRAND_LOGO_URL || ''}" alt="Digital-grownt" style="max-height:52px;max-width:220px"></div>
             <div style="padding:34px"><h2 style="margin:0 0 18px">${subject.replace(/[<>&"]/g,'')}</h2><div style="white-space:pre-line;line-height:1.7;color:#4b5563">${message.replace(/[<>&"]/g,'')}</div>
-              <p style="margin:28px 0 0;text-align:center"><a href="${String(process.env.FRONTEND_URL || '').replace(/\/$/,'')}/frontend/user/notification.html" style="display:inline-block;background:#0052ff;color:#fff;padding:13px 22px;border-radius:9px;text-decoration:none;font-weight:700">View message on dashboard</a></p>
+              <p style="margin:28px 0 0;text-align:center"><a href="${String(process.env.FRONTEND_URL || '').replace(/\/$/,'')}/user/notification.html" style="display:inline-block;background:#0052ff;color:#fff;padding:13px 22px;border-radius:9px;text-decoration:none;font-weight:700">View message on dashboard</a></p>
             </div>
           </div>
         </div>` });
@@ -788,8 +788,8 @@ router.get('/dashboard/switchuser/:id', async (req, res) => {
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
     if (user.status === 'blocked') return res.status(403).json({ success: false, message: 'Blocked users cannot be impersonated' });
     res.cookie('jwt', createToken(user._id), { httpOnly: true, sameSite: process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax'), secure: process.env.NODE_ENV === 'production' || process.env.COOKIE_SAMESITE === 'none', maxAge: 3 * 24 * 60 * 60 * 1000, path: '/' });
-    if (wantsJson(req)) return res.json({ success: true, message: `Logged in as ${user.name}`, redirect: frontendAdmin(req, '/frontend/user/dashboard.html') });
-    return res.redirect(frontendAdmin(req, '/frontend/user/dashboard.html'));
+    if (wantsJson(req)) return res.json({ success: true, message: `Logged in as ${user.name}`, redirect: frontendAdmin(req, '/user/dashboard.html') });
+    return res.redirect(frontendAdmin(req, '/user/dashboard.html'));
   } catch (error) { console.error(error); return res.status(500).json({ success: false, message: 'Could not login as user' }); }
 });
 
@@ -855,13 +855,13 @@ router.post('/dashboard/processkyc', async (req, res) => {
       user.isVerified = true; user.verificationStatus = 'verified'; user.account_verify = 'Verified'; user.verificationBannerDismissed = true;
       await user.save({ validateBeforeSave: false });
       await notifyUser(user, 'kyc', 'KYC KYC Verified', message, '/user/notification.html', { icon: 'bell', tag: `kyc-verified-${user._id}-${Date.now()}` });
-      return res.json({ success: true, message: 'KYC verified successfully', redirect: `${frontendUrl()}/frontend/admin/kyc-applications.html` });
+      return res.json({ success: true, message: 'KYC verified successfully', redirect: `${frontendUrl()}/admin/kyc-applications.html` });
     }
     await Verify.findByIdAndDelete(application._id);
     user.isVerified = false; user.verificationStatus = 'not_verified'; user.account_verify = 'Not Verified'; user.verificationBannerDismissed = false;
     await user.save({ validateBeforeSave: false });
     await notifyUser(user, 'kyc', 'KYC Rejected', message, '/user/notification.html', { icon: 'bell', tag: `kyc-rejected-${user._id}-${Date.now()}` });
-    return res.json({ success: true, message: 'KYC application rejected', redirect: `${frontendUrl()}/frontend/admin/kyc-applications.html` });
+    return res.json({ success: true, message: 'KYC application rejected', redirect: `${frontendUrl()}/admin/kyc-applications.html` });
   } catch (error) {
     console.error('processkyc error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Could not process KYC' });
@@ -890,7 +890,7 @@ router.get('/dashboard/deltask/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete task page',
-    redirect: `${frontendUrl()}/frontend/admin/task.html?delete=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/task.html?delete=${req.params.id}`
   });
 });
 
@@ -898,7 +898,7 @@ router.get('/dashboard/markdone/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mark done page',
-    redirect: `${frontendUrl()}/frontend/admin/task.html?done=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/task.html?done=${req.params.id}`
   });
 });
 
@@ -914,7 +914,7 @@ router.get('/dashboard/convert/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin convert page',
-    redirect: `${frontendUrl()}/frontend/admin/convert.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/convert.html?id=${req.params.id}`
   });
 });
 
@@ -932,7 +932,7 @@ router.get('/dashboard/user-wallet/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin user wallet page',
-    redirect: `${frontendUrl()}/frontend/admin/user-wallet.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/user-wallet.html?id=${req.params.id}`
   });
 });
 
@@ -951,7 +951,7 @@ router.get('/dashboard/login-activity/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin login activity page',
-    redirect: `${frontendUrl()}/frontend/admin/login-activity.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/login-activity.html?id=${req.params.id}`
   });
 });
 
@@ -959,7 +959,7 @@ router.get('/dashboard/clear-activity/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin clear activity page',
-    redirect: `${frontendUrl()}/frontend/admin/clear-activity.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/clear-activity.html?id=${req.params.id}`
   });
 });
 
@@ -967,7 +967,7 @@ router.get('/dashboard/add-referral/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin add referral page',
-    redirect: `${frontendUrl()}/frontend/admin/add-referral.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/add-referral.html?id=${req.params.id}`
   });
 });
 
@@ -987,7 +987,7 @@ router.get('/dashboard/email-verify/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin email verify page',
-    redirect: `${frontendUrl()}/frontend/admin/email-verify.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/email-verify.html?id=${req.params.id}`
   });
 });
 
@@ -1008,7 +1008,7 @@ router.get('/dashboard/deleteplan/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete plan page',
-    redirect: `${frontendUrl()}/frontend/admin/deleteplan.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/deleteplan.html?id=${req.params.id}`
   });
 });
 
@@ -1016,7 +1016,7 @@ router.get('/dashboard/approveplan/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin approve plan page',
-    redirect: `${frontendUrl()}/frontend/admin/approveplan.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/approveplan.html?id=${req.params.id}`
   });
 });
 
@@ -1024,7 +1024,7 @@ router.get('/dashboard/markas/:status/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mark plan as page',
-    redirect: `${frontendUrl()}/frontend/admin/markas.html?status=${req.params.status}&id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/markas.html?status=${req.params.status}&id=${req.params.id}`
   });
 });
 
@@ -1061,7 +1061,7 @@ router.post('/dashboard/processdeposit/:id', async (req, res) => {
     await createHistory(user, amount, 'deposit', 'Deposit', 'processed', { source: 'admin-deposit', deposit_id: String(deposit._id), payment_method: deposit.payment_method || deposit.type || '' });
     const symbol = currencySymbol(user.currency_code);
     await notifyUser(user, 'deposit', 'Deposit Approved', `Your deposit of ${symbol}${amount.toFixed(2)} has been approved and credited to your account.`, '/user/notification.html', { icon: 'bell', tag: `deposit-approved-${deposit._id}` });
-    return res.json({ success: true, message: 'Deposit processed successfully', redirect: `${frontendUrl()}/frontend/admin/mdeposits.html` });
+    return res.json({ success: true, message: 'Deposit processed successfully', redirect: `${frontendUrl()}/admin/mdeposits.html` });
   } catch (error) {
     console.error('processdeposit error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Could not process deposit' });
@@ -1083,7 +1083,7 @@ router.get('/dashboard/deldeposit/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete deposit page',
-    redirect: `${frontendUrl()}/frontend/admin/deldeposit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/deldeposit.html?id=${req.params.id}`
   });
 });
 
@@ -1091,7 +1091,7 @@ router.get('/dashboard/pdeposit/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin process deposit page',
-    redirect: `${frontendUrl()}/frontend/admin/pdeposit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/pdeposit.html?id=${req.params.id}`
   });
 });
 
@@ -1099,7 +1099,7 @@ router.get('/dashboard/viewimage/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin view deposit image page',
-    redirect: `${frontendUrl()}/frontend/admin/viewimage.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/viewimage.html?id=${req.params.id}`
   });
 });
 
@@ -1140,7 +1140,7 @@ router.post('/dashboard/processwithdrawal/:id', async (req, res) => {
       const symbol = currencySymbol(user.currency_code);
       await notifyUser(user, 'withdrawal', 'Withdrawal Approved', `Your withdrawal of ${symbol}${amount.toFixed(2)} has been processed and approved.`, '/user/notification.html', { icon: 'bell', tag: `withdrawal-approved-${withdrawal._id}` });
     }
-    return res.json({ success: true, message: 'Withdrawal processed successfully', redirect: `${frontendUrl()}/frontend/admin/mwithdrawals.html` });
+    return res.json({ success: true, message: 'Withdrawal processed successfully', redirect: `${frontendUrl()}/admin/mwithdrawals.html` });
   } catch (error) {
     console.error('processwithdrawal error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Could not process withdrawal' });
@@ -1164,7 +1164,7 @@ router.post('/dashboard/rejectwithdrawal/:id', async (req, res) => {
         await notifyUser(user, 'withdrawal', 'Withdrawal Rejected', `Your withdrawal of ${symbol}${Number(withdrawal.amount_requested ?? withdrawal.amount ?? 0).toFixed(2)} has been rejected.`, '/user/notification.html', { icon: 'bell', tag: `withdrawal-rejected-${withdrawal._id}` });
       }
     }
-    return res.json({ success: true, message: 'Withdrawal rejected successfully', redirect: `${frontendUrl()}/frontend/admin/mwithdrawals.html` });
+    return res.json({ success: true, message: 'Withdrawal rejected successfully', redirect: `${frontendUrl()}/admin/mwithdrawals.html` });
   } catch (error) {
     console.error('rejectwithdrawal error:', error);
     return res.status(500).json({ success: false, message: error.message || 'Could not reject withdrawal' });
@@ -1194,7 +1194,7 @@ router.get('/dashboard/process-withdrawal-request/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin process withdrawal request page',
-    redirect: `${frontendUrl()}/frontend/admin/process-withdrawal-request.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/process-withdrawal-request.html?id=${req.params.id}`
   });
 });
 
@@ -1220,7 +1220,7 @@ router.get('/dashboard/edit-method/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin edit payment method page',
-    redirect: `${frontendUrl()}/frontend/admin/edit-method.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/edit-method.html?id=${req.params.id}`
   });
 });
 
@@ -1228,7 +1228,7 @@ router.get('/dashboard/delete-method/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete payment method page',
-    redirect: `${frontendUrl()}/frontend/admin/delete-method.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/delete-method.html?id=${req.params.id}`
   });
 });
 
@@ -1236,7 +1236,7 @@ router.get('/dashboard/toggle-method-status/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin toggle payment method status page',
-    redirect: `${frontendUrl()}/frontend/admin/toggle-method-status.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/toggle-method-status.html?id=${req.params.id}`
   });
 });
 
@@ -1284,7 +1284,7 @@ router.get('/dashboard/settings/payment-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin payment settings page',
-    redirect: `${frontendUrl()}/frontend/admin/payment-settings.html`
+    redirect: `${frontendUrl()}/admin/payment-settings.html`
   });
 });
 
@@ -1297,7 +1297,7 @@ router.get('/dashboard/mwalletconnect', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin wallet connect page',
-    redirect: `${frontendUrl()}/frontend/admin/mwalletconnect.html`
+    redirect: `${frontendUrl()}/admin/mwalletconnect.html`
   });
 });
 
@@ -1305,7 +1305,7 @@ router.get('/dashboard/mwalletsettings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin wallet settings page',
-    redirect: `${frontendUrl()}/frontend/admin/mwalletsettings.html`
+    redirect: `${frontendUrl()}/admin/mwalletsettings.html`
   });
 });
 
@@ -1313,7 +1313,7 @@ router.get('/dashboard/mwalletdelete/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin wallet delete page',
-    redirect: `${frontendUrl()}/frontend/admin/mwalletdelete.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/mwalletdelete.html?id=${req.params.id}`
   });
 });
 
@@ -1329,7 +1329,7 @@ router.get('/dashboard/user-wallet-disconnect/:walletId', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin user wallet disconnect page',
-    redirect: `${frontendUrl()}/frontend/admin/user-wallet-disconnect.html?walletId=${req.params.walletId}`
+    redirect: `${frontendUrl()}/admin/user-wallet-disconnect.html?walletId=${req.params.walletId}`
   });
 });
 
@@ -1339,7 +1339,7 @@ router.get('/dashboard/ipaddress', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin ip address page',
-    redirect: `${frontendUrl()}/frontend/admin/ipaddress.html`
+    redirect: `${frontendUrl()}/admin/ipaddress.html`
   });
 });
 
@@ -1347,7 +1347,7 @@ router.get('/dashboard/allipaddress', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin all ip address page',
-    redirect: `${frontendUrl()}/frontend/admin/allipaddress.html`
+    redirect: `${frontendUrl()}/admin/allipaddress.html`
   });
 });
 
@@ -1355,7 +1355,7 @@ router.get('/dashboard/delete-ip/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete ip page',
-    redirect: `${frontendUrl()}/frontend/admin/delete-ip.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/delete-ip.html?id=${req.params.id}`
   });
 });
 
@@ -1405,7 +1405,7 @@ router.get('/dashboard/deletewdmethod/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete wd method page',
-    redirect: `${frontendUrl()}/frontend/admin/deletewdmethod.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/deletewdmethod.html?id=${req.params.id}`
   });
 });
 
@@ -1415,7 +1415,7 @@ router.get('/dashboard/unblock/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin unblock admin page',
-    redirect: `${frontendUrl()}/frontend/admin/unblock.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/unblock.html?id=${req.params.id}`
   });
 });
 
@@ -1423,7 +1423,7 @@ router.get('/dashboard/ublock/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin block admin page',
-    redirect: `${frontendUrl()}/frontend/admin/ublock.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/ublock.html?id=${req.params.id}`
   });
 });
 
@@ -1431,7 +1431,7 @@ router.get('/dashboard/deleletadmin/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete admin page',
-    redirect: `${frontendUrl()}/frontend/admin/deleletadmin.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/deleletadmin.html?id=${req.params.id}`
   });
 });
 
@@ -1447,7 +1447,7 @@ router.get('/dashboard/adminchangepassword', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin change password page',
-    redirect: `${frontendUrl()}/frontend/admin/adminchangepassword.html`
+    redirect: `${frontendUrl()}/admin/adminchangepassword.html`
   });
 });
 
@@ -1463,7 +1463,7 @@ router.get('/dashboard/resetadpwd/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin reset admin password page',
-    redirect: `${frontendUrl()}/frontend/admin/resetadpwd.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/resetadpwd.html?id=${req.params.id}`
   });
 });
 
@@ -1569,7 +1569,7 @@ router.get('/dashboard/delfaq/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete faq page',
-    redirect: `${frontendUrl()}/frontend/admin/delfaq.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/delfaq.html?id=${req.params.id}`
   });
 });
 
@@ -1577,7 +1577,7 @@ router.get('/dashboard/deltestimony/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete testimony page',
-    redirect: `${frontendUrl()}/frontend/admin/deltestimony.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/deltestimony.html?id=${req.params.id}`
   });
 });
 
@@ -1585,7 +1585,7 @@ router.get('/dashboard/privacy-policy', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin privacy policy page',
-    redirect: `${frontendUrl()}/frontend/admin/privacy-policy.html`
+    redirect: `${frontendUrl()}/admin/privacy-policy.html`
   });
 });
 
@@ -1619,7 +1619,7 @@ router.get('/dashboard/trashplan/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin trash plan page',
-    redirect: `${frontendUrl()}/frontend/admin/trashplan.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/trashplan.html?id=${req.params.id}`
   });
 });
 
@@ -1637,7 +1637,7 @@ router.get('/dashboard/viewagent/:agent', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin view agent page',
-    redirect: `${frontendUrl()}/frontend/admin/viewagent.html?agent=${req.params.agent}`
+    redirect: `${frontendUrl()}/admin/viewagent.html?agent=${req.params.agent}`
   });
 });
 
@@ -1645,7 +1645,7 @@ router.get('/dashboard/delagent/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin delete agent page',
-    redirect: `${frontendUrl()}/frontend/admin/delagent.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/delagent.html?id=${req.params.id}`
   });
 });
 
@@ -1679,7 +1679,7 @@ router.get('/dashboard/settings/app-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin app settings page',
-    redirect: `${frontendUrl()}/frontend/admin/app-settings.html`
+    redirect: `${frontendUrl()}/admin/app-settings.html`
   });
 });
 
@@ -1711,7 +1711,7 @@ router.get('/dashboard/settings/convert-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin convert settings page',
-    redirect: `${frontendUrl()}/frontend/admin/convert-settings.html`
+    redirect: `${frontendUrl()}/admin/convert-settings.html`
   });
 });
 
@@ -1729,7 +1729,7 @@ router.get('/dashboard/conversions', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin conversions page',
-    redirect: `${frontendUrl()}/frontend/admin/conversions.html`
+    redirect: `${frontendUrl()}/admin/conversions.html`
   });
 });
 
@@ -1747,7 +1747,7 @@ router.get('/dashboard/settings/referral-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin referral settings page',
-    redirect: `${frontendUrl()}/frontend/admin/referral-settings.html`
+    redirect: `${frontendUrl()}/admin/referral-settings.html`
   });
 });
 
@@ -1765,7 +1765,7 @@ router.get('/download-doc', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin download doc page',
-    redirect: `${frontendUrl()}/frontend/admin/download-doc.html`
+    redirect: `${frontendUrl()}/admin/download-doc.html`
   });
 });
 
@@ -1791,7 +1791,7 @@ router.get('/dashboard/settings/subscription-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin subscription settings page',
-    redirect: `${frontendUrl()}/frontend/admin/subscription-settings.html`
+    redirect: `${frontendUrl()}/admin/subscription-settings.html`
   });
 });
 
@@ -1801,7 +1801,7 @@ router.get('/dashboard/settings/color-settings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin color settings page',
-    redirect: `${frontendUrl()}/frontend/admin/color-settings.html`
+    redirect: `${frontendUrl()}/admin/color-settings.html`
   });
 });
 
@@ -1827,7 +1827,7 @@ router.get('/dashboard/settings/exchange-rates', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin exchange rates page',
-    redirect: `${frontendUrl()}/frontend/admin/exchange-rates.html`
+    redirect: `${frontendUrl()}/admin/exchange-rates.html`
   });
 });
 
@@ -1869,7 +1869,7 @@ router.get('/dashboard/setcryptostatus/:asset/:status', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin set crypto status page',
-    redirect: `${frontendUrl()}/frontend/admin/setcryptostatus.html?asset=${req.params.asset}&status=${req.params.status}`
+    redirect: `${frontendUrl()}/admin/setcryptostatus.html?asset=${req.params.asset}&status=${req.params.status}`
   });
 });
 
@@ -1877,7 +1877,7 @@ router.get('/dashboard/useexchange/:value', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin use exchange page',
-    redirect: `${frontendUrl()}/frontend/admin/useexchange.html?value=${req.params.value}`
+    redirect: `${frontendUrl()}/admin/useexchange.html?value=${req.params.value}`
   });
 });
 
@@ -1895,7 +1895,7 @@ router.get('/courses', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin courses page',
-    redirect: `${frontendUrl()}/frontend/admin/courses.html`
+    redirect: `${frontendUrl()}/admin/courses.html`
   });
 });
 
@@ -1935,7 +1935,7 @@ router.get('/courses-lessons/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin courses lessons page',
-    redirect: `${frontendUrl()}/frontend/admin/courses-lessons.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/courses-lessons.html?id=${req.params.id}`
   });
 });
 
@@ -1975,7 +1975,7 @@ router.get('/categories', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin categories page',
-    redirect: `${frontendUrl()}/frontend/admin/categories.html`
+    redirect: `${frontendUrl()}/admin/categories.html`
   });
 });
 
@@ -1999,7 +1999,7 @@ router.get('/lessons-without-course', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin lessons without course page',
-    redirect: `${frontendUrl()}/frontend/admin/lessons-without-course.html`
+    redirect: `${frontendUrl()}/admin/lessons-without-course.html`
   });
 });
 
@@ -2009,7 +2009,7 @@ router.get('/signal', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin signal page',
-    redirect: `${frontendUrl()}/frontend/admin/signal.html`
+    redirect: `${frontendUrl()}/admin/signal.html`
   });
 });
 
@@ -2017,7 +2017,7 @@ router.get('/signal-plans', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin signal plans page',
-    redirect: `${frontendUrl()}/frontend/admin/signal-plans.html`
+    redirect: `${frontendUrl()}/admin/signal-plans.html`
   });
 });
 
@@ -2027,7 +2027,7 @@ router.get('/managetrades', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage trades page',
-    redirect: `${frontendUrl()}/frontend/admin/managetrades.html`
+    redirect: `${frontendUrl()}/admin/managetrades.html`
   });
 });
 
@@ -2035,7 +2035,7 @@ router.get('/managetrades/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin manage trade details page',
-    redirect: `${frontendUrl()}/frontend/admin/managetrades.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/managetrades.html?id=${req.params.id}`
   });
 });
 
@@ -2043,7 +2043,7 @@ router.get('/trades/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin create trade page',
-    redirect: `${frontendUrl()}/frontend/admin/trades-create.html`
+    redirect: `${frontendUrl()}/admin/trades-create.html`
   });
 });
 
@@ -2059,7 +2059,7 @@ router.get('/users/search', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin users search page',
-    redirect: `${frontendUrl()}/frontend/admin/users-search.html`
+    redirect: `${frontendUrl()}/admin/users-search.html`
   });
 });
 
@@ -2067,7 +2067,7 @@ router.get('/trades/:trade/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin edit trade page',
-    redirect: `${frontendUrl()}/frontend/admin/trades-edit.html?trade=${req.params.trade}`
+    redirect: `${frontendUrl()}/admin/trades-edit.html?trade=${req.params.trade}`
   });
 });
 
@@ -2101,7 +2101,7 @@ router.get('/assets', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin assets page',
-    redirect: `${frontendUrl()}/frontend/admin/assets.html`
+    redirect: `${frontendUrl()}/admin/assets.html`
   });
 });
 
@@ -2117,7 +2117,7 @@ router.get('/assets/:id/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin edit asset page',
-    redirect: `${frontendUrl()}/frontend/admin/assets-edit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/assets-edit.html?id=${req.params.id}`
   });
 });
 
@@ -2157,7 +2157,7 @@ router.get('/assets/refresh', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin assets refresh page',
-    redirect: `${frontendUrl()}/frontend/admin/assets.html?refresh=1`
+    redirect: `${frontendUrl()}/admin/assets.html?refresh=1`
   });
 });
 
@@ -2167,7 +2167,7 @@ router.get('/experts', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin experts page',
-    redirect: `${frontendUrl()}/frontend/admin/experts.html`
+    redirect: `${frontendUrl()}/admin/experts.html`
   });
 });
 
@@ -2175,7 +2175,7 @@ router.get('/copy-trades', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin copy trades page',
-    redirect: `${frontendUrl()}/frontend/admin/copy-trades.html`
+    redirect: `${frontendUrl()}/admin/copy-trades.html`
   });
 });
 
@@ -2183,7 +2183,7 @@ router.get('/copy-trades/:position', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin copy trade position page',
-    redirect: `${frontendUrl()}/frontend/admin/copy-trades.html?position=${req.params.position}`
+    redirect: `${frontendUrl()}/admin/copy-trades.html?position=${req.params.position}`
   });
 });
 
@@ -2225,7 +2225,7 @@ router.get('/bot-trading', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin bot trading page',
-    redirect: `${frontendUrl()}/frontend/admin/bot-trading.html`
+    redirect: `${frontendUrl()}/admin/bot-trading.html`
   });
 });
 
@@ -2233,7 +2233,7 @@ router.get('/bot-trading/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin bot trading create page',
-    redirect: `${frontendUrl()}/frontend/admin/bot-trading-create.html`
+    redirect: `${frontendUrl()}/admin/bot-trading-create.html`
   });
 });
 
@@ -2249,7 +2249,7 @@ router.get('/bot-trading/:bot/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin bot trading edit page',
-    redirect: `${frontendUrl()}/frontend/admin/bot-trading-edit.html?bot=${req.params.bot}`
+    redirect: `${frontendUrl()}/admin/bot-trading-edit.html?bot=${req.params.bot}`
   });
 });
 
@@ -2281,7 +2281,7 @@ router.get('/bot-trading/subscriptions', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin bot trading subscriptions page',
-    redirect: `${frontendUrl()}/frontend/admin/bot-trading-subscriptions.html`
+    redirect: `${frontendUrl()}/admin/bot-trading-subscriptions.html`
   });
 });
 
@@ -2289,7 +2289,7 @@ router.get('/bot-trading/subscriptions/:subscription', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin bot trading subscription details page',
-    redirect: `${frontendUrl()}/frontend/admin/bot-trading-subscriptions.html?subscription=${req.params.subscription}`
+    redirect: `${frontendUrl()}/admin/bot-trading-subscriptions.html?subscription=${req.params.subscription}`
   });
 });
 
@@ -2323,7 +2323,7 @@ router.get('/dashboard/support-tickets', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin support tickets page',
-    redirect: `${frontendUrl()}/frontend/admin/support-tickets.html`
+    redirect: `${frontendUrl()}/admin/support-tickets.html`
   });
 });
 
@@ -2331,7 +2331,7 @@ router.get('/dashboard/support-tickets/:ticket', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin support ticket details page',
-    redirect: `${frontendUrl()}/frontend/admin/support-tickets.html?ticket=${req.params.ticket}`
+    redirect: `${frontendUrl()}/admin/support-tickets.html?ticket=${req.params.ticket}`
   });
 });
 
@@ -2357,7 +2357,7 @@ router.get('/nfts', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nfts page',
-    redirect: `${frontendUrl()}/frontend/admin/nfts.html`
+    redirect: `${frontendUrl()}/admin/nfts.html`
   });
 });
 
@@ -2365,7 +2365,7 @@ router.get('/nfts/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nfts create page',
-    redirect: `${frontendUrl()}/frontend/admin/nfts-create.html`
+    redirect: `${frontendUrl()}/admin/nfts-create.html`
   });
 });
 
@@ -2381,7 +2381,7 @@ router.get('/nfts/:nft/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nfts edit page',
-    redirect: `${frontendUrl()}/frontend/admin/nfts-edit.html?nft=${req.params.nft}`
+    redirect: `${frontendUrl()}/admin/nfts-edit.html?nft=${req.params.nft}`
   });
 });
 
@@ -2421,7 +2421,7 @@ router.get('/nfts/sold', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nfts sold page',
-    redirect: `${frontendUrl()}/frontend/admin/nfts-sold.html`
+    redirect: `${frontendUrl()}/admin/nfts-sold.html`
   });
 });
 
@@ -2429,7 +2429,7 @@ router.get('/nfts/transfers', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nfts transfers page',
-    redirect: `${frontendUrl()}/frontend/admin/nfts-transfers.html`
+    redirect: `${frontendUrl()}/admin/nfts-transfers.html`
   });
 });
 
@@ -2438,7 +2438,7 @@ router.get('/nft-categories', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nft categories page',
-    redirect: `${frontendUrl()}/frontend/admin/nft-categories.html`
+    redirect: `${frontendUrl()}/admin/nft-categories.html`
   });
 });
 
@@ -2471,7 +2471,7 @@ router.get('/nft-collections', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nft collections page',
-    redirect: `${frontendUrl()}/frontend/admin/nft-collections.html`
+    redirect: `${frontendUrl()}/admin/nft-collections.html`
   });
 });
 
@@ -2479,7 +2479,7 @@ router.get('/nft-collections/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nft collections create page',
-    redirect: `${frontendUrl()}/frontend/admin/nft-collections-create.html`
+    redirect: `${frontendUrl()}/admin/nft-collections-create.html`
   });
 });
 
@@ -2495,7 +2495,7 @@ router.get('/nft-collections/:collection/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin nft collections edit page',
-    redirect: `${frontendUrl()}/frontend/admin/nft-collections-edit.html?collection=${req.params.collection}`
+    redirect: `${frontendUrl()}/admin/nft-collections-edit.html?collection=${req.params.collection}`
   });
 });
 
@@ -2529,7 +2529,7 @@ router.get('/loan-plans', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin loan plans page',
-    redirect: `${frontendUrl()}/frontend/admin/loan-plans.html`
+    redirect: `${frontendUrl()}/admin/loan-plans.html`
   });
 });
 
@@ -2537,7 +2537,7 @@ router.get('/loan-plans/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin loan plans create page',
-    redirect: `${frontendUrl()}/frontend/admin/loan-plans-create.html`
+    redirect: `${frontendUrl()}/admin/loan-plans-create.html`
   });
 });
 
@@ -2553,7 +2553,7 @@ router.get('/loan-plans/:plan/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin loan plans edit page',
-    redirect: `${frontendUrl()}/frontend/admin/loan-plans-edit.html?plan=${req.params.plan}`
+    redirect: `${frontendUrl()}/admin/loan-plans-edit.html?plan=${req.params.plan}`
   });
 });
 
@@ -2577,7 +2577,7 @@ router.get('/loans/:loan', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin loan details page',
-    redirect: `${frontendUrl()}/frontend/admin/loans.html?loan=${req.params.loan}`
+    redirect: `${frontendUrl()}/admin/loans.html?loan=${req.params.loan}`
   });
 });
 
@@ -2611,7 +2611,7 @@ router.get('/cards', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin cards page',
-    redirect: `${frontendUrl()}/frontend/admin/cards.html`
+    redirect: `${frontendUrl()}/admin/cards.html`
   });
 });
 
@@ -2619,7 +2619,7 @@ router.get('/cards/types/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin cards types create page',
-    redirect: `${frontendUrl()}/frontend/admin/cards-types-create.html`
+    redirect: `${frontendUrl()}/admin/cards-types-create.html`
   });
 });
 
@@ -2635,7 +2635,7 @@ router.get('/cards/types/:cardType/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin cards types edit page',
-    redirect: `${frontendUrl()}/frontend/admin/cards-types-edit.html?cardType=${req.params.cardType}`
+    redirect: `${frontendUrl()}/admin/cards-types-edit.html?cardType=${req.params.cardType}`
   });
 });
 
@@ -2659,7 +2659,7 @@ router.get('/cards/:card/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin cards edit page',
-    redirect: `${frontendUrl()}/frontend/admin/cards-edit.html?card=${req.params.card}`
+    redirect: `${frontendUrl()}/admin/cards-edit.html?card=${req.params.card}`
   });
 });
 
@@ -2675,7 +2675,7 @@ router.get('/cards/:card', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin card details page',
-    redirect: `${frontendUrl()}/frontend/admin/cards.html?card=${req.params.card}`
+    redirect: `${frontendUrl()}/admin/cards.html?card=${req.params.card}`
   });
 });
 
@@ -2741,7 +2741,7 @@ router.get('/bids', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin bids page',
-    redirect: `${frontendUrl()}/frontend/admin/bids.html`
+    redirect: `${frontendUrl()}/admin/bids.html`
   });
 });
 
@@ -2767,7 +2767,7 @@ router.get('/pre-ipo', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo.html`
+    redirect: `${frontendUrl()}/admin/pre-ipo.html`
   });
 });
 
@@ -2775,7 +2775,7 @@ router.get('/pre-ipo/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo create page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo-create.html`
+    redirect: `${frontendUrl()}/admin/pre-ipo-create.html`
   });
 });
 
@@ -2791,7 +2791,7 @@ router.get('/pre-ipo/all/holdings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo all holdings page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo-holdings.html`
+    redirect: `${frontendUrl()}/admin/pre-ipo-holdings.html`
   });
 });
 
@@ -2799,7 +2799,7 @@ router.get('/pre-ipo/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo details page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/pre-ipo.html?id=${req.params.id}`
   });
 });
 
@@ -2807,7 +2807,7 @@ router.get('/pre-ipo/:id/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo edit page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo-edit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/pre-ipo-edit.html?id=${req.params.id}`
   });
 });
 
@@ -2847,7 +2847,7 @@ router.get('/pre-ipo/:id/holdings', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo holdings page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo-holdings.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/pre-ipo-holdings.html?id=${req.params.id}`
   });
 });
 
@@ -2855,7 +2855,7 @@ router.get('/pre-ipo/:id/price-history', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin pre-ipo price history page',
-    redirect: `${frontendUrl()}/frontend/admin/pre-ipo-price-history.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/pre-ipo-price-history.html?id=${req.params.id}`
   });
 });
 
@@ -2865,7 +2865,7 @@ router.get('/stock-shares', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin stock shares page',
-    redirect: `${frontendUrl()}/frontend/admin/stock-shares.html`
+    redirect: `${frontendUrl()}/admin/stock-shares.html`
   });
 });
 
@@ -2873,7 +2873,7 @@ router.get('/stock-shares/trades', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin stock shares trades page',
-    redirect: `${frontendUrl()}/frontend/admin/stock-shares-trades.html`
+    redirect: `${frontendUrl()}/admin/stock-shares-trades.html`
   });
 });
 
@@ -2881,7 +2881,7 @@ router.get('/stock-shares/user/:userId', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin stock shares user positions page',
-    redirect: `${frontendUrl()}/frontend/admin/stock-shares-user.html?userId=${req.params.userId}`
+    redirect: `${frontendUrl()}/admin/stock-shares-user.html?userId=${req.params.userId}`
   });
 });
 
@@ -2897,7 +2897,7 @@ router.get('/stock-shares/positions/:id/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin stock shares position edit page',
-    redirect: `${frontendUrl()}/frontend/admin/stock-shares-positions-edit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/stock-shares-positions-edit.html?id=${req.params.id}`
   });
 });
 
@@ -2923,7 +2923,7 @@ router.get('/dashboard/clearcache', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin clear cache page',
-    redirect: `${frontendUrl()}/frontend/admin/clearcache.html`
+    redirect: `${frontendUrl()}/admin/clearcache.html`
   });
 });
 
@@ -2933,7 +2933,7 @@ router.get('/real-estate', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin real estate page',
-    redirect: `${frontendUrl()}/frontend/admin/real-estate.html`
+    redirect: `${frontendUrl()}/admin/real-estate.html`
   });
 });
 
@@ -2941,7 +2941,7 @@ router.get('/real-estate/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin real estate create page',
-    redirect: `${frontendUrl()}/frontend/admin/real-estate-create.html`
+    redirect: `${frontendUrl()}/admin/real-estate-create.html`
   });
 });
 
@@ -2957,7 +2957,7 @@ router.get('/real-estate/investments', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin real estate investments page',
-    redirect: `${frontendUrl()}/frontend/admin/real-estate-investments.html`
+    redirect: `${frontendUrl()}/admin/real-estate-investments.html`
   });
 });
 
@@ -2965,7 +2965,7 @@ router.get('/real-estate/:id/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin real estate edit page',
-    redirect: `${frontendUrl()}/frontend/admin/real-estate-edit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/real-estate-edit.html?id=${req.params.id}`
   });
 });
 
@@ -2981,7 +2981,7 @@ router.get('/real-estate/:id/delete', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin real estate delete page',
-    redirect: `${frontendUrl()}/frontend/admin/real-estate.html?delete=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/real-estate.html?delete=${req.params.id}`
   });
 });
 
@@ -2991,7 +2991,7 @@ router.get('/mining/plans', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mining plans page',
-    redirect: `${frontendUrl()}/frontend/admin/mining-plans.html`
+    redirect: `${frontendUrl()}/admin/mining-plans.html`
   });
 });
 
@@ -2999,7 +2999,7 @@ router.get('/mining/plans/create', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mining plans create page',
-    redirect: `${frontendUrl()}/frontend/admin/mining-plans-create.html`
+    redirect: `${frontendUrl()}/admin/mining-plans-create.html`
   });
 });
 
@@ -3015,7 +3015,7 @@ router.get('/mining/plans/:id/edit', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mining plans edit page',
-    redirect: `${frontendUrl()}/frontend/admin/mining-plans-edit.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/mining-plans-edit.html?id=${req.params.id}`
   });
 });
 
@@ -3039,7 +3039,7 @@ router.get('/mining/subscriptions', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend admin mining subscriptions page',
-    redirect: `${frontendUrl()}/frontend/admin/mining-subscriptions.html`
+    redirect: `${frontendUrl()}/admin/mining-subscriptions.html`
   });
 });
 
@@ -3073,7 +3073,7 @@ router.get('/all-wallets', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend all wallets page',
-    redirect: `${frontendUrl()}/frontend/admin/wallets.html`
+    redirect: `${frontendUrl()}/admin/wallets.html`
   });
 });
 
@@ -3089,7 +3089,7 @@ router.get('/add-wallet', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend add wallet page',
-    redirect: `${frontendUrl()}/frontend/admin/add-wallet.html`
+    redirect: `${frontendUrl()}/admin/add-wallet.html`
   });
 });
 
@@ -3116,7 +3116,7 @@ router.get('/edit-wallet/:id', (req, res) => {
   return res.status(200).json({
     success: true,
     message: 'Use the frontend edit wallet page',
-    redirect: `${frontendUrl()}/frontend/admin/edit-wallet.html?id=${req.params.id}`
+    redirect: `${frontendUrl()}/admin/edit-wallet.html?id=${req.params.id}`
   });
 });
 
@@ -3392,7 +3392,7 @@ return res.json({success:true,plan:p});
 
 router.post('/dashboard/feature/plans',async(req,res)=>{const b=req.body;
 const p=await FeaturePlans.create({name:String(b.name||'').trim(),price:featureNum(b.price),min:featureNum(b.min_price??b.min),max:featureNum(b.max_price??b.max),min_price:featureNum(b.min_price??b.min),max_price:featureNum(b.max_price??b.max),min_return:featureNum(b.minr??b.min_return),max_return:featureNum(b.maxr??b.max_return),minr:featureNum(b.minr),maxr:featureNum(b.maxr),duration:featureNum(b.duration,30),expiration:String(b.expiration||`${featureNum(b.duration,30)} Days`),return:featureNum(b.return??b.increment_amount),type:String(b.type||'Main'),status:featureBool(b.status===undefined?true:b.status)?'active':'inactive',tag:String(b.tag||''),icon:String(b.icon||'chart-bar'),increment_interval:String(b.t_interval||b.increment_interval||'Daily'),increment_type:String(b.t_type||b.increment_type||'Percentage'),increment_amount:featureNum(b.t_amount??b.increment_amount??b.return),gift:featureNum(b.gift)});
-return featureLocalRedirect(res,'/frontend/admin/plans.html','Plan created successfully.',{plan:p});
+return featureLocalRedirect(res,'/admin/plans.html','Plan created successfully.',{plan:p});
 });
 
 router.put('/dashboard/feature/plans/:id',async(req,res)=>{const p=await FeaturePlans.findById(req.params.id);
@@ -3400,11 +3400,11 @@ if(!p)return res.status(404).json({success:false,message:'Plan not found.'});
 const b=req.body;
 Object.assign(p,{name:String(b.name||p.name).trim(),price:featureNum(b.price,p.price),min:featureNum(b.min_price??b.min,p.min),max:featureNum(b.max_price??b.max,p.max),min_price:featureNum(b.min_price??b.min,p.min_price),max_price:featureNum(b.max_price??b.max,p.max_price),minr:featureNum(b.minr,p.minr),maxr:featureNum(b.maxr,p.maxr),min_return:featureNum(b.minr??b.min_return,p.min_return),max_return:featureNum(b.maxr??b.max_return,p.max_return),duration:featureNum(b.duration,p.duration),expiration:String(b.expiration||p.expiration),status:featureBool(b.status===undefined?p.status:b.status)?'active':'inactive',tag:String(b.tag??p.tag),increment_interval:String(b.t_interval||b.increment_interval||p.increment_interval),increment_type:String(b.t_type||b.increment_type||p.increment_type),increment_amount:featureNum(b.t_amount??b.increment_amount??b.return,p.increment_amount),return:featureNum(b.return??b.increment_amount,p.return),gift:featureNum(b.gift,p.gift)});
 await p.save();
-return featureLocalRedirect(res,'/frontend/admin/plans.html','Plan Successfully Updated',{plan:p});
+return featureLocalRedirect(res,'/admin/plans.html','Plan Successfully Updated',{plan:p});
 });
 
 router.delete('/dashboard/feature/plans/:id',async(req,res)=>{await FeaturePlans.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/plans.html','Investment Plan deleted Successfully!');
+return featureLocalRedirect(res,'/admin/plans.html','Investment Plan deleted Successfully!');
 });
 
 /* ---------------- ADMIN: wallet ---------------- */
@@ -3415,13 +3415,13 @@ s.min_balance=featureNum(req.body.min_balance,s.min_balance);
 s.daily_reward=featureNum(req.body.min_return??req.body.daily_reward,s.daily_reward);
 s.wallet_status=['on','off'].includes(String(req.body.wallet_status).toLowerCase())?String(req.body.wallet_status).toLowerCase():s.wallet_status;
 await s.save();
-return featureLocalRedirect(res,'/frontend/admin/mwalletsettings.html','Wallet settings updated successfully.');
+return featureLocalRedirect(res,'/admin/mwalletsettings.html','Wallet settings updated successfully.');
 });
 
 router.get('/dashboard/feature/wallet-connections',async(req,res)=>res.json({success:true,wallets:await FeatureWalletConnection.find().populate('user_id','name email').sort({createdAt:-1}).lean()}));
 
 router.delete('/dashboard/feature/wallet-connections/:id',async(req,res)=>{await FeatureWalletConnection.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/mwalletconnect.html','Wallet deleted Sucessful!');
+return featureLocalRedirect(res,'/admin/mwalletconnect.html','Wallet deleted Sucessful!');
 });
 
 router.get('/dashboard/feature/user/:id/wallet-status',async(req,res)=>{const u=await User.findById(req.params.id).lean();
@@ -3455,7 +3455,7 @@ return res.json({success:true,type:t});
 
 router.post('/dashboard/feature/card-types',async(req,res)=>{const b=req.body;
 const t=await FeatureCardType.create({name:String(b.name||'').trim(),type:String(b.type||'Physical'),network:String(b.network||'Visa'),fee:featureNum(b.fee),issuance_fee:featureNum(b.fee),delivery_days:featureNum(b.delivery_days),description:String(b.description||''),is_active:featureBool(b.is_active)});
-return featureLocalRedirect(res,'/frontend/admin/admin-cards.html','Card type created successfully.',{type:t});
+return featureLocalRedirect(res,'/admin/admin-cards.html','Card type created successfully.',{type:t});
 });
 
 router.put('/dashboard/feature/card-types/:id',async(req,res)=>{const t=await FeatureCardType.findById(req.params.id);
@@ -3463,18 +3463,18 @@ if(!t)return res.status(404).json({success:false,message:'Card type not found.'}
 const b=req.body;
 Object.assign(t,{name:String(b.name??t.name),type:String(b.type??t.type),network:String(b.network??t.network),fee:featureNum(b.fee,t.fee),issuance_fee:featureNum(b.fee,t.issuance_fee),delivery_days:featureNum(b.delivery_days,t.delivery_days),description:String(b.description??t.description),is_active:featureBool(b.is_active===undefined?t.is_active:b.is_active)});
 await t.save();
-return featureLocalRedirect(res,'/frontend/admin/admin-cards.html','Card type updated successfully.');
+return featureLocalRedirect(res,'/admin/admin-cards.html','Card type updated successfully.');
 });
 
 router.post('/dashboard/feature/card-types/:id/toggle',async(req,res)=>{const t=await FeatureCardType.findById(req.params.id);
 if(!t)return res.status(404).json({success:false,message:'Card type not found.'});
 t.is_active=!t.is_active;
 await t.save();
-return featureLocalRedirect(res,'/frontend/admin/admin-cards.html',`Card type ${t.is_active?'enabled':'disabled'}.`);
+return featureLocalRedirect(res,'/admin/admin-cards.html',`Card type ${t.is_active?'enabled':'disabled'}.`);
 });
 
 router.delete('/dashboard/feature/card-types/:id',async(req,res)=>{await FeatureCardType.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/admin-cards.html','Card type deleted successfully.');
+return featureLocalRedirect(res,'/admin/admin-cards.html','Card type deleted successfully.');
 });
 
 router.get('/dashboard/feature/cards/:id',async(req,res)=>{const c=await FeatureCard.findById(req.params.id).populate('user_id','name email currency_code').populate('card_type_id').lean();
@@ -3507,7 +3507,7 @@ c.activated_at=now;
 c.status='active';
 await c.save();
 await featureNotifyUser(c.user_id,'account','Card Approved',`Your ${c.card_type_id.name} card has been approved and is now active.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/admin/cards-view.html?id='+c._id,'card approved and issued successfully');
+return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'card approved and issued successfully');
 });
 
 router.post('/dashboard/feature/cards/:id/reject',async(req,res)=>{const c=await FeatureCard.findById(req.params.id).populate('user_id').populate('card_type_id');
@@ -3515,7 +3515,7 @@ if(!c)return res.status(404).json({success:false,message:'Card not found.'});
 c.status='rejected';
 await c.save();
 await featureNotifyUser(c.user_id,'account','Card Rejected',`Your ${c.card_type_id.name} card application was rejected.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/admin/cards-view.html?id='+c._id,'Card application rejected.');
+return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'Card application rejected.');
 });
 
 router.post('/dashboard/feature/cards/:id/freeze',async(req,res)=>{const c=await FeatureCard.findById(req.params.id);
@@ -3524,7 +3524,7 @@ c.status='frozen';
 c.blocked_at=new Date();
 c.block_reason=String(req.body.reason||'');
 await c.save();
-return featureLocalRedirect(res,'/frontend/admin/cards-view.html?id='+c._id,'Card frozen.');
+return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'Card frozen.');
 });
 
 router.post('/dashboard/feature/cards/:id/unfreeze',async(req,res)=>{const c=await FeatureCard.findById(req.params.id);
@@ -3533,14 +3533,14 @@ c.status='active';
 c.blocked_at=null;
 c.block_reason=null;
 await c.save();
-return featureLocalRedirect(res,'/frontend/admin/cards-view.html?id='+c._id,'Card unfrozen and set to active.');
+return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'Card unfrozen and set to active.');
 });
 
 router.post('/dashboard/feature/cards/:id/cancel',async(req,res)=>{const c=await FeatureCard.findById(req.params.id);
 if(!c)return res.status(404).json({success:false,message:'Card not found.'});
 c.status='cancelled';
 await c.save();
-return featureLocalRedirect(res,'/frontend/admin/cards-view.html?id='+c._id,'Card cancelled.');
+return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'Card cancelled.');
 });
 
 router.put('/dashboard/feature/cards/:id',async(req,res)=>{const c=await FeatureCard.findById(req.params.id);
@@ -3548,7 +3548,7 @@ if(!c)return res.status(404).json({success:false,message:'Card not found.'});
 for(const k of ['card_holder','card_number','expiry_month','expiry_year','cvv','status'])if(req.body[k]!==undefined)c[k]=req.body[k];
 if(req.body.balance!==undefined)c.balance=featureNum(req.body.balance);
 await c.save();
-return featureLocalRedirect(res,'/frontend/admin/cards-view.html?id='+c._id,'Card details updated successfully.');
+return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'Card details updated successfully.');
 });
 
 /* ---------------- ADMIN: experts ---------------- */
@@ -3561,7 +3561,7 @@ return res.json({success:true,expert:e,positions:await FeatureCopyPosition.find(
 
 router.post('/dashboard/feature/experts',async(req,res)=>{const b=req.body;
 const e=await FeatureExpert.create({name:String(b.name||'').trim(),area_of_expertise:String(b.area_of_expertise||''),bio:String(b.bio||''),profile_picture:String(b.profile_picture||''),daily_roi:featureNum(b.daily_roi),duration_days:featureNum(b.duration_days,30),win_rate:featureNum(b.win_rate),min_startup_capital:featureNum(b.min_startup_capital),max_capital:featureNum(b.max_capital),profit_share_percentage:featureNum(b.profit_share_percentage),followers_count:featureNum(b.followers_count),total_roi:featureNum(b.total_roi),is_active:featureBool(b.is_active===undefined?true:b.is_active)});
-return featureLocalRedirect(res,'/frontend/admin/admin-experts.html','Expert created successfully.',{expert:e});
+return featureLocalRedirect(res,'/admin/admin-experts.html','Expert created successfully.',{expert:e});
 });
 
 router.put('/dashboard/feature/experts/:id',async(req,res)=>{const e=await FeatureExpert.findById(req.params.id);
@@ -3570,18 +3570,18 @@ for(const k of ['name','area_of_expertise','bio','profile_picture'])if(req.body[
 for(const k of ['daily_roi','duration_days','win_rate','min_startup_capital','max_capital','profit_share_percentage','followers_count','total_roi'])if(req.body[k]!==undefined)e[k]=featureNum(req.body[k]);
 if(req.body.is_active!==undefined)e.is_active=featureBool(req.body.is_active);
 await e.save();
-return featureLocalRedirect(res,'/frontend/admin/admin-experts.html','Expert updated successfully.');
+return featureLocalRedirect(res,'/admin/admin-experts.html','Expert updated successfully.');
 });
 
 router.post('/dashboard/feature/experts/:id/toggle',async(req,res)=>{const e=await FeatureExpert.findById(req.params.id);
 if(!e)return res.status(404).json({success:false,message:'Expert not found.'});
 e.is_active=!e.is_active;
 await e.save();
-return featureLocalRedirect(res,'/frontend/admin/admin-experts.html',`Expert ${e.is_active?'enabled':'disabled'}.`);
+return featureLocalRedirect(res,'/admin/admin-experts.html',`Expert ${e.is_active?'enabled':'disabled'}.`);
 });
 
 router.delete('/dashboard/feature/experts/:id',async(req,res)=>{await FeatureExpert.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/admin-experts.html','Expert deleted successfully.');
+return featureLocalRedirect(res,'/admin/admin-experts.html','Expert deleted successfully.');
 });
 
 /* ---------------- ADMIN: bots ---------------- */
@@ -3597,7 +3597,7 @@ return res.json({success:true,bot:b});
 
 router.post('/dashboard/feature/bots',async(req,res)=>{const b=req.body;
 const bot=await FeatureTradingBot.create({name:String(b.name||''),strategy_type:String(b.strategy_type||'Scalping'),description:String(b.description||''),win_rate:featureNum(b.win_rate),expected_roi:featureNum(b.expected_roi),trade_interval_minutes:featureNum(b.trade_interval_minutes,60),min_investment:featureNum(b.min_investment),max_investment:featureNum(b.max_investment),max_duration_days:featureNum(b.max_duration_days,30),profit_min_pct:featureNum(b.profit_min_pct),profit_max_pct:featureNum(b.profit_max_pct),loss_min_pct:featureNum(b.loss_min_pct),loss_max_pct:featureNum(b.loss_max_pct),is_active:featureBool(b.is_active)});
-return featureLocalRedirect(res,'/frontend/admin/admin-bot-trading.html','Trading bot created successfully.');
+return featureLocalRedirect(res,'/admin/admin-bot-trading.html','Trading bot created successfully.');
 });
 
 router.put('/dashboard/feature/bots/:id',async(req,res)=>{const b=await FeatureTradingBot.findById(req.params.id);
@@ -3606,18 +3606,18 @@ for(const k of ['name','strategy_type','description'])if(req.body[k]!==undefined
 for(const k of ['win_rate','expected_roi','trade_interval_minutes','min_investment','max_investment','max_duration_days','profit_min_pct','profit_max_pct','loss_min_pct','loss_max_pct'])if(req.body[k]!==undefined)b[k]=featureNum(req.body[k]);
 if(req.body.is_active!==undefined)b.is_active=featureBool(req.body.is_active);
 await b.save();
-return featureLocalRedirect(res,'/frontend/admin/admin-bot-trading.html','Trading bot updated successfully.');
+return featureLocalRedirect(res,'/admin/admin-bot-trading.html','Trading bot updated successfully.');
 });
 
 router.post('/dashboard/feature/bots/:id/toggle',async(req,res)=>{const b=await FeatureTradingBot.findById(req.params.id);
 if(!b)return res.status(404).json({success:false,message:'Bot not found.'});
 b.is_active=!b.is_active;
 await b.save();
-return featureLocalRedirect(res,'/frontend/admin/admin-bot-trading.html',`Bot ${b.is_active?'enabled':'disabled'}.`);
+return featureLocalRedirect(res,'/admin/admin-bot-trading.html',`Bot ${b.is_active?'enabled':'disabled'}.`);
 });
 
 router.delete('/dashboard/feature/bots/:id',async(req,res)=>{await FeatureTradingBot.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/admin-bot-trading.html','bot-trade deleted successfully.');
+return featureLocalRedirect(res,'/admin/admin-bot-trading.html','bot-trade deleted successfully.');
 });
 
 router.get('/dashboard/feature/bot-subscriptions',async(req,res)=>res.json({success:true,subscriptions:await FeatureBotSubscription.find().populate('bot_id').populate('user_id','name email').sort({createdAt:-1}).lean()}));
@@ -3632,7 +3632,7 @@ if(!s)return res.status(404).json({success:false,message:'Subscription not found
 s.admin_profit_adjustment=featureNum(req.body.admin_profit_adjustment);
 s.admin_notes=String(req.body.admin_notes||'');
 await s.save();
-return featureLocalRedirect(res,'/frontend/admin/bot-trading-subscriptions-view.html?id='+s._id,'Profit adjustment saved.');
+return featureLocalRedirect(res,'/admin/bot-trading-subscriptions-view.html?id='+s._id,'Profit adjustment saved.');
 });
 
 router.post('/dashboard/feature/bot-subscriptions/:id/settle',async(req,res)=>{const s=await FeatureBotSubscription.findById(req.params.id).populate('user_id').populate('bot_id');
@@ -3646,7 +3646,7 @@ await s.save();
 s.user_id.account_bal+=payout;
 await s.user_id.save();
 await featureNotifyUser(s.user_id,'trade','Bot Subscription Settled',`Your bot subscription has been settled. $${payout.toFixed(2)} has been credited to your balance.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/admin/bot-trading-subscriptions-view.html?id='+s._id,`Subscription settled. $${payout.toFixed(2)} credited to user.`);
+return featureLocalRedirect(res,'/admin/bot-trading-subscriptions-view.html?id='+s._id,`Subscription settled. $${payout.toFixed(2)} credited to user.`);
 });
 
 /* ---------------- ADMIN: assets ---------------- */
@@ -3683,7 +3683,7 @@ const coingeckoId=String(b.coingecko_id||'').trim();
 const twelvedataSymbol=String(b.twelvedata_symbol||'').trim();
 const externalId=String(b.external_id||coingeckoId||twelvedataSymbol||'').trim();
 const a=await FeatureTradingAsset.create({name:String(b.name||''),symbol:String(b.symbol||'').toUpperCase(),asset_class:String(b.asset_class||'crypto').toLowerCase(),price:featureNum(b.price),price_change_pct_24h:featureNum(b.change_24h),change_24h:featureNum(b.change_24h),is_active:featureBool(b.is_active===undefined?true:b.is_active),external_id:externalId,coingecko_id:coingeckoId,twelvedata_symbol:twelvedataSymbol,data_source:source,logo_url:String(b.logo_url||'')});
-return featureLocalRedirect(res,'/frontend/admin/assets.html',`${a.symbol} created successfully`);
+return featureLocalRedirect(res,'/admin/assets.html',`${a.symbol} created successfully`);
 });
 
 router.put('/dashboard/feature/assets/:id',async(req,res)=>{const a=await FeatureTradingAsset.findById(req.params.id);
@@ -3694,18 +3694,18 @@ if(req.body.asset_class!==undefined)a.asset_class=String(req.body.asset_class).t
 for(const k of ['price','change_24h','price_change_pct_24h'])if(req.body[k]!==undefined)a[k]=featureNum(req.body[k]);
 if(req.body.is_active!==undefined)a.is_active=featureBool(req.body.is_active);
 await a.save();
-return featureLocalRedirect(res,'/frontend/admin/edit-assets.html?id='+a._id,`${a.symbol} updated successfully.`);
+return featureLocalRedirect(res,'/admin/edit-assets.html?id='+a._id,`${a.symbol} updated successfully.`);
 });
 
 router.post('/dashboard/feature/assets/:id/toggle',async(req,res)=>{const a=await FeatureTradingAsset.findById(req.params.id);
 if(!a)return res.status(404).json({success:false,message:'Asset not found.'});
 a.is_active=!a.is_active;
 await a.save();
-return featureLocalRedirect(res,'/frontend/admin/assets.html',`${a.symbol} ${a.is_active?'enabled':'disabled'}.`);
+return featureLocalRedirect(res,'/admin/assets.html',`${a.symbol} ${a.is_active?'enabled':'disabled'}.`);
 });
 
 router.delete('/dashboard/feature/assets/:id',async(req,res)=>{await FeatureTradingAsset.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/assets.html','Asset deleted successfully.');
+return featureLocalRedirect(res,'/admin/assets.html','Asset deleted successfully.');
 });
 
 /* ---------------- ADMIN: mining ---------------- */
@@ -3721,7 +3721,7 @@ return res.json({success:true,plan:p});
 
 router.post('/dashboard/feature/mining-plans',async(req,res)=>{const b=req.body;
 const p=await FeatureMiningPlan.create({name:String(b.name||''),hashrate:String(b.hashrate||''),description:String(b.description||''),daily_roi_percentage:featureNum(b.daily_roi_percentage),duration_days:featureNum(b.duration_days,30),sort_order:featureNum(b.sort_order),min_investment:featureNum(b.min_investment),max_investment:featureNum(b.max_investment),icon_color:String(b.icon_color||''),is_active:featureBool(b.is_active)});
-return featureLocalRedirect(res,'/frontend/admin/mining-plans.html','mining plan created successfully');
+return featureLocalRedirect(res,'/admin/mining-plans.html','mining plan created successfully');
 });
 
 router.put('/dashboard/feature/mining-plans/:id',async(req,res)=>{const p=await FeatureMiningPlan.findById(req.params.id);
@@ -3730,18 +3730,18 @@ for(const k of ['name','hashrate','description','icon_color'])if(req.body[k]!==u
 for(const k of ['daily_roi_percentage','duration_days','sort_order','min_investment','max_investment'])if(req.body[k]!==undefined)p[k]=featureNum(req.body[k]);
 if(req.body.is_active!==undefined)p.is_active=featureBool(req.body.is_active);
 await p.save();
-return featureLocalRedirect(res,'/frontend/admin/mining-plans.html','mining plan updated successfully');
+return featureLocalRedirect(res,'/admin/mining-plans.html','mining plan updated successfully');
 });
 
 router.post('/dashboard/feature/mining-plans/:id/toggle',async(req,res)=>{const p=await FeatureMiningPlan.findById(req.params.id);
 if(!p)return res.status(404).json({success:false,message:'Mining plan not found.'});
 p.is_active=!p.is_active;
 await p.save();
-return featureLocalRedirect(res,'/frontend/admin/mining-plans.html','Mining plan status updated.');
+return featureLocalRedirect(res,'/admin/mining-plans.html','Mining plan status updated.');
 });
 
 router.delete('/dashboard/feature/mining-plans/:id',async(req,res)=>{await FeatureMiningPlan.findByIdAndDelete(req.params.id);
-return featureLocalRedirect(res,'/frontend/admin/mining-plans.html','mining plan deleted successfully');
+return featureLocalRedirect(res,'/admin/mining-plans.html','mining plan deleted successfully');
 });
 
 router.get('/dashboard/feature/mining-subscriptions',async(req,res)=>{const subs=await FeatureMiningSubscription.find().populate('user_id','name email').populate('mining_plan_id').sort({createdAt:-1}).lean();
@@ -3759,7 +3759,7 @@ await s.save();
 s.user_id.account_bal+=payout;
 await s.user_id.save();
 await featureNotifyUser(s.user_id,'trade','Mining Settled',`Your mining subscription has been settled. $${payout.toFixed(2)} has been credited to your balance.`,'/user/notification.html',{icon:'bell'});
-return featureLocalRedirect(res,'/frontend/admin/mining-subscriptions.html',`Subscription settled. $${payout.toFixed(2)} credited to user.`);
+return featureLocalRedirect(res,'/admin/mining-subscriptions.html',`Subscription settled. $${payout.toFixed(2)} credited to user.`);
 });
 
 router.put('/dashboard/feature/mining-subscriptions/:id/adjust',async(req,res)=>{const s=await FeatureMiningSubscription.findById(req.params.id);
@@ -3767,7 +3767,7 @@ if(!s)return res.status(404).json({success:false,message:'Subscription not found
 s.admin_profit_adjustment=featureNum(req.body.admin_profit_adjustment);
 s.admin_notes=String(req.body.admin_notes||'');
 await s.save();
-return featureLocalRedirect(res,'/frontend/admin/mining-subscriptions.html','Profit adjustment saved.');
+return featureLocalRedirect(res,'/admin/mining-subscriptions.html','Profit adjustment saved.');
 });
 
 /* ---------------- ADMIN: trades ---------------- */
@@ -3787,14 +3787,14 @@ return res.json({success:true,trade:t});
 
 router.post('/dashboard/feature/trades',async(req,res)=>{const b=req.body;
 const t=await FeatureTrade.create({user_id:b.user_id,trading_asset_id:b.trading_asset_id,asset_type:String(b.asset_type||'Crypto'),asset_name:String(b.asset_name||''),action:String(b.action||'BUY'),amount:featureNum(b.amount),leverage:featureNum(b.leverage,1),duration:featureNum(b.duration),status:String(b.status||'open').toLowerCase(),result:String(b.result||''),profit_loss:featureNum(b.profit_loss),entry_price:featureNum(b.entry_price),opened:new Date()});
-return featureLocalRedirect(res,'/frontend/admin/managetrades.html','trade created successfully',{trade:t});
+return featureLocalRedirect(res,'/admin/managetrades.html','trade created successfully',{trade:t});
 });
 
 router.put('/dashboard/feature/trades/:id',async(req,res)=>{const t=await FeatureTrade.findById(req.params.id);
 if(!t)return res.status(404).json({success:false,message:'FeatureTrade not found.'});
 for(const k of ['user_id','trading_asset_id','asset_type','asset_name','action','amount','leverage','duration','status','result','profit_loss','entry_price'])if(req.body[k]!==undefined)t[k]=['amount','leverage','duration','profit_loss','entry_price'].includes(k)?featureNum(req.body[k]):req.body[k];
 await t.save();
-return featureLocalRedirect(res,'/frontend/admin/managetrades.html','trade updated successfully');
+return featureLocalRedirect(res,'/admin/managetrades.html','trade updated successfully');
 });
 
 router.post('/dashboard/feature/trades/:id/settle',async(req,res)=>{const t=await FeatureTrade.findById(req.params.id).populate('user_id');
@@ -3809,7 +3809,7 @@ await t.save();
 if(t.user_id){t.user_id.account_bal+=pl;
 await t.user_id.save();
 await featureNotifyUser(t.user_id,'trade','FeatureTrade Settled',`Your trade has been settled with ${pl>=0?'+':''}$${pl.toFixed(2)}.`,'/user/notification.html',{icon:'bell'});
-}return featureLocalRedirect(res,'/frontend/admin/view-trade.html?id='+t._id,'profit adjusted successfully');
+}return featureLocalRedirect(res,'/admin/view-trade.html?id='+t._id,'profit adjusted successfully');
 });
 
 router.get('/dashboard/feature/active-investments',async(req,res)=>{
@@ -3852,7 +3852,7 @@ await fresh.user.save();
 
   await featureNotifyUser(fresh.user,'investment','Plan Settled',`Your ${fresh.plan.name} investment has been settled and ${payout.toFixed(2)} has been credited.`,'/user/notification.html',{icon:'bell'});
 
-  return featureLocalRedirect(res,'/frontend/admin/active-investments.html','Investment settled successfully.');
+  return featureLocalRedirect(res,'/admin/active-investments.html','Investment settled successfully.');
 
 });
 
