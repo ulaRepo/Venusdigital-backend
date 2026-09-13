@@ -4,7 +4,7 @@ const router = require('express').Router();
 const User = require('../models/user.model');
 const Deposit = require('../models/depositSchema');
 const Widthdraw = require('../models/widthdrawSchema');
-// const Trade = require('../models/livetradingSchema');
+const Trade = require('../models/livetradingSchema');
 // const Upgrade = require('../models/upgradeSchema');
 const Verify = require('../models/verifySchema');
 // const CopyTrade = require('../models/CopyTrade');
@@ -3560,14 +3560,17 @@ if(!e)return res.status(404).json({success:false,message:'Expert not found.'});
 return res.json({success:true,expert:e,positions:await FeatureCopyPosition.find({expert_id:e._id}).populate('user_id','name email').sort({createdAt:-1}).lean()});
 });
 
-router.post('/dashboard/feature/experts',async(req,res)=>{const b=req.body;
-const e=await FeatureExpert.create({name:String(b.name||'').trim(),area_of_expertise:String(b.area_of_expertise||''),bio:String(b.bio||''),profile_picture:String(b.profile_picture||''),daily_roi:featureNum(b.daily_roi),duration_days:featureNum(b.duration_days,30),win_rate:featureNum(b.win_rate),min_startup_capital:featureNum(b.min_startup_capital),max_capital:featureNum(b.max_capital),profit_share_percentage:featureNum(b.profit_share_percentage),followers_count:featureNum(b.followers_count),total_roi:featureNum(b.total_roi),is_active:featureBool(b.is_active===undefined?true:b.is_active)});
+router.post('/dashboard/feature/experts', uploadCopyTrader.single('profile_picture'), async(req,res)=>{const b=req.body;
+const pic=cloudUrl(req.file)||String(b.profile_picture||'');
+const e=await FeatureExpert.create({name:String(b.name||'').trim(),area_of_expertise:String(b.area_of_expertise||''),bio:String(b.bio||''),profile_picture:pic,daily_roi:featureNum(b.daily_roi),duration_days:featureNum(b.duration_days,30),win_rate:featureNum(b.win_rate),min_startup_capital:featureNum(b.min_startup_capital),max_capital:featureNum(b.max_capital),profit_share_percentage:featureNum(b.profit_share_percentage),followers_count:featureNum(b.followers_count),total_roi:featureNum(b.total_roi),is_active:featureBool(b.is_active===undefined?true:b.is_active)});
 return featureLocalRedirect(res,'/admin/admin-experts.html','Expert created successfully.',{expert:e});
 });
 
-router.put('/dashboard/feature/experts/:id',async(req,res)=>{const e=await FeatureExpert.findById(req.params.id);
+router.put('/dashboard/feature/experts/:id', uploadCopyTrader.single('profile_picture'), async(req,res)=>{const e=await FeatureExpert.findById(req.params.id);
 if(!e)return res.status(404).json({success:false,message:'Expert not found.'});
-for(const k of ['name','area_of_expertise','bio','profile_picture'])if(req.body[k]!==undefined)e[k]=String(req.body[k]);
+for(const k of ['name','area_of_expertise','bio'])if(req.body[k]!==undefined)e[k]=String(req.body[k]);
+if(req.file) e.profile_picture=cloudUrl(req.file);
+else if(req.body.profile_picture!==undefined) e.profile_picture=String(req.body.profile_picture);
 for(const k of ['daily_roi','duration_days','win_rate','min_startup_capital','max_capital','profit_share_percentage','followers_count','total_roi'])if(req.body[k]!==undefined)e[k]=featureNum(req.body[k]);
 if(req.body.is_active!==undefined)e.is_active=featureBool(req.body.is_active);
 await e.save();
@@ -3586,6 +3589,53 @@ return featureLocalRedirect(res,'/admin/admin-experts.html','Expert deleted succ
 });
 
 /* ---------------- ADMIN: bots ---------------- */
+
+router.get('/dashboard/feature/copy-positions',async(req,res)=>{
+  const positions=await FeatureCopyPosition.find().populate('user_id','name email').populate('expert_id').populate('expert').sort({createdAt:-1}).lean();
+  const active=positions.filter(x=>x.status==='active');
+  const settled=positions.filter(x=>['settled','completed','stopped'].includes(x.status));
+  return res.json({success:true,positions,stats:{
+    activeCopies:active.length,
+    totalInvested:positions.reduce((s,x)=>s+featureNum(x.invested_amount),0),
+    totalProfit:positions.reduce((s,x)=>s+featureNum(x.accumulated_profit||x.current_profit),0),
+    settledPositions:settled.length
+  }});
+});
+router.get('/dashboard/feature/copy-positions/:id',async(req,res)=>{
+  const p=await FeatureCopyPosition.findById(req.params.id).populate('user_id','name email currency_code').populate('expert_id').populate('expert').lean();
+  if(!p)return res.status(404).json({success:false,message:'Position not found.'});
+  if(p.status==='active'){ const full=await FeatureCopyPosition.findById(p._id); await featureAccrueCopyPosition(full); }
+  const fresh=await FeatureCopyPosition.findById(req.params.id).populate('user_id','name email currency_code').populate('expert_id').populate('expert').lean();
+  return res.json({success:true,position:fresh});
+});
+router.post('/dashboard/feature/copy-positions/:id/adjust',async(req,res)=>{
+  const p=await FeatureCopyPosition.findById(req.params.id);
+  if(!p)return res.status(404).json({success:false,message:'Position not found.'});
+  p.admin_profit_adjustment=featureNum(req.body.admin_profit_adjustment);
+  p.admin_notes=String(req.body.admin_notes||p.admin_notes||'');
+  await p.save();
+  return featureLocalRedirect(res,'/admin/viewUser-copy-trades.html?id='+p._id,'Profit adjustment saved');
+});
+router.post('/dashboard/feature/copy-positions/:id/force-stop',async(req,res)=>{
+  const p=await FeatureCopyPosition.findById(req.params.id).populate('user_id');
+  if(!p)return res.status(404).json({success:false,message:'Position not found.'});
+  if(p.status!=='active')return res.status(409).json({success:false,message:'Position is not active.'});
+  await featureAccrueCopyPosition(p);
+  p.status='stopped'; p.stopped_at=new Date(); await p.save();
+  return featureLocalRedirect(res,'/admin/viewUser-copy-trades.html?id='+p._id,'Position force-stopped.');
+});
+router.post('/dashboard/feature/copy-positions/:id/settle',async(req,res)=>{
+  const p=await FeatureCopyPosition.findById(req.params.id).populate('user_id').populate('expert_id').populate('expert');
+  if(!p)return res.status(404).json({success:false,message:'Position not found.'});
+  if(p.status==='settled')return res.status(409).json({success:false,message:'Already settled.'});
+  if(p.status==='active') await featureAccrueCopyPosition(p);
+  const payout=featureNum(p.invested_amount)+featureNum(p.accumulated_profit)+featureNum(p.admin_profit_adjustment);
+  if(p.user_id){ p.user_id.account_bal=featureNum(p.user_id.account_bal)+payout; await p.user_id.save(); }
+  p.status='settled'; p.settled_at=new Date(); p.settled_by='admin'; await p.save();
+  try{ await featureNotifyUser(p.user_id,'copy_trade','Copy Position Settled',`Your copy position has been settled. $${payout.toFixed(2)} credited.`,'/user/notification.html',{icon:'bell'}); }catch(e){}
+  return featureLocalRedirect(res,'/admin/viewUser-copy-trades.html?id='+p._id,`Position settled. $${payout.toFixed(2)} credited to user.`);
+});
+
 router.get('/dashboard/feature/bots',async(req,res)=>{const bots=await FeatureTradingBot.find().sort({createdAt:-1}).lean();
 const subs=await FeatureBotSubscription.find().populate('bot_id').populate('user_id','name email').sort({createdAt:-1}).lean();
 return res.json({success:true,bots,subscriptions:subs,stats:{totalBots:bots.length,activeBots:bots.filter(x=>x.is_active).length,activeSubscribers:subs.filter(x=>x.status==='active').length,totalInvested:subs.reduce((s,x)=>s+featureNum(x.invested_amount),0),totalProfit:subs.reduce((s,x)=>s+featureNum(x.current_profit),0),settled:subs.filter(x=>x.status==='settled').length}});

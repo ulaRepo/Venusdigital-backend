@@ -2647,7 +2647,7 @@ router.post('/dashboard/feature/copy/start/:id', async(req,res)=>{ const u=await
  u.account_bal-=amount;
  await u.save();
  const p=await FeatureCopyPosition.create({user_id:u._id,expert_id:e._id,invested_amount:amount,daily_roi_snapshot:featureNum(e.daily_roi),started_at:now,expires_at:new Date(now.getTime()+featureNum(e.duration_days,30)*86400000),status:'active'});
- await featureNotifyUser(u,'copy_trade','Started Copying FeatureExpert',`You are now copying ${e.name} with $${amount.toFixed(2)} for ${featureNum(e.duration_days,30)} days.`,'/user/notification.html',{icon:'bell'});
+ await featureNotifyUser(u,'copy_trade','Started Copying Expert',`You are now copying ${e.name} with $${amount.toFixed(2)} for ${featureNum(e.duration_days,30)} days.`,'/user/notification.html',{icon:'bell'});
  return featureLocalRedirect(res,'/user/copy-trading.html',`You have started copying ${e.name}!`,{position:p});
  });
 
