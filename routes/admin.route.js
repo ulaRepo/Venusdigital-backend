@@ -4,7 +4,7 @@ const router = require('express').Router();
 const User = require('../models/user.model');
 const Deposit = require('../models/depositSchema');
 const Widthdraw = require('../models/widthdrawSchema');
-// const Trade = require('../models/livetradingSchema');
+const Trade = require('../models/livetradingSchema');
 // const Upgrade = require('../models/upgradeSchema');
 const Verify = require('../models/verifySchema');
 // const CopyTrade = require('../models/CopyTrade');
@@ -3705,11 +3705,24 @@ router.get('/dashboard/feature/assets',async(req,res)=>res.json({success:true,as
 
 router.post('/dashboard/feature/assets/refresh',async(req,res)=>{
   try{
-    const result=await refreshAllAssets({activeOnly:req.body?.activeOnly!==false});
-    const status=result.failed>0&&result.updated===0?502:200;
-    return res.status(status).json(result);
+    const result=await refreshAllAssets({
+      activeOnly:req.body?.activeOnly!==false,
+      assetClass: req.body?.asset_class || req.body?.assetClass || req.query?.asset_class || null
+    });
+    // Always 200 with payload so frontend can show toast (avoid axios 502 for partial provider failures)
+    return res.status(200).json({
+      success: Boolean(result.success),
+      message: result.message || (result.updated ? `Updated ${result.updated} assets.` : 'Price refresh finished with no updates.'),
+      updated: result.updated||0,
+      failed: result.failed||0,
+      total: result.total||0,
+      results: result.results||[],
+      failedAssets: result.failedAssets||[],
+      refreshed_at: result.refreshed_at
+    });
   }catch(error){
-    return res.status(500).json({success:false,message:error.message});
+    console.error('assets/refresh error:', error);
+    return res.status(500).json({success:false,message:error.message||'Price refresh failed'});
   }
 });
 
@@ -3718,7 +3731,7 @@ router.post('/dashboard/feature/assets/:id/refresh',async(req,res)=>{
     const asset=await refreshAsset(req.params.id);
     return res.json({success:true,message:`${asset.symbol} price refreshed successfully.`,asset});
   }catch(error){
-    const status=error.message==='Asset not found.'?404:502;
+    const status=error.message==='Asset not found.'?404:400;
     return res.status(status).json({success:false,message:error.message});
   }
 });

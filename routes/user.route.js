@@ -2768,4 +2768,77 @@ if(s.status==='active')await featureAccrueMining(await FeatureMiningSubscription
 return res.json({success:true,subscription:await FeatureMiningSubscription.findById(s._id).populate('mining_plan_id').lean()});
 });
 
+
+const FeatureLiveTrade = require('../models/livetradingSchema');
+
+router.get('/dashboard/feature/trades', async(req,res)=>{
+  try{
+    const u=await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const trades=await FeatureLiveTrade.find({user_id:u._id}).populate('trading_asset_id').sort({createdAt:-1}).lean();
+    return res.json({success:true,trades,balance:featureNum(u.account_bal),demo_balance:featureNum(u.demo_balance||u.demo_bal||0)});
+  }catch(e){return res.status(500).json({success:false,message:e.message});}
+});
+
+router.post('/dashboard/feature/trades', async(req,res)=>{
+  try{
+    const u=await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const b=req.body||{};
+    const amount=featureNum(b.amount);
+    if(amount<=0) return res.status(422).json({success:false,message:'Enter a valid amount.'});
+    const isDemo=Boolean(b.is_demo||b.demo||b.mode==='demo');
+    const balField=isDemo?'demo_balance':'account_bal';
+    // support alternate demo field names
+    let bal=featureNum(u.account_bal);
+    if(isDemo){
+      bal=featureNum(u.demo_balance!=null?u.demo_balance:(u.demo_bal!=null?u.demo_bal:0));
+    }
+    if(amount>bal) return res.status(422).json({success:false,message:'Insufficient balance.'});
+    const assetId=b.trading_asset_id||b.asset_id;
+    const asset=assetId?await FeatureTradingAsset.findById(assetId):null;
+    if(!asset) return res.status(404).json({success:false,message:'Asset not found.'});
+    const entry=featureNum(asset.price||asset.current_price||b.entry_price);
+    const leverage=featureNum(b.leverage,5)||5;
+    const duration=featureNum(b.duration||b.duration_minutes,5);
+    const action=String(b.action||'BUY').toUpperCase();
+    const tradeType=String(b.trade_type||b.type||'Binary');
+    // deduct
+    if(isDemo){
+      if(u.demo_balance!=null) u.demo_balance=featureNum(u.demo_balance)-amount;
+      else if(u.demo_bal!=null) u.demo_bal=featureNum(u.demo_bal)-amount;
+      else { /* no demo field - still record trade */ }
+    } else {
+      u.account_bal=featureNum(u.account_bal)-amount;
+    }
+    await u.save();
+    const trade=await FeatureLiveTrade.create({
+      user_id:u._id,
+      trading_asset_id:asset._id,
+      asset_type:String(asset.asset_class||'Crypto'),
+      asset_name:`${asset.symbol} — ${asset.name}`,
+      action,
+      amount,
+      leverage,
+      duration,
+      entry_price:entry,
+      status:'open',
+      result:'',
+      profit_loss:0,
+      settled_by:'',
+      opened:new Date(),
+      is_demo:isDemo,
+      trade_type:tradeType
+    });
+    try{
+      await featureNotifyUser(u._id,'trade','Trade Opened',`You opened a ${action} ${tradeType} trade on ${asset.symbol} for $${amount.toFixed(2)}.`,`/user/trade.html`,{icon:'bell'});
+    }catch(_){}
+    return res.json({success:true,message:'Trade placed successfully.',trade});
+  }catch(e){
+    console.error(e);
+    return res.status(500).json({success:false,message:e.message});
+  }
+});
+
+
 module.exports = router;
