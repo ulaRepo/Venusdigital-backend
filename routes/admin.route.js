@@ -4,7 +4,7 @@ const router = require('express').Router();
 const User = require('../models/user.model');
 const Deposit = require('../models/depositSchema');
 const Widthdraw = require('../models/widthdrawSchema');
-const Trade = require('../models/livetradingSchema');
+// const Trade = require('../models/livetradingSchema');
 // const Upgrade = require('../models/upgradeSchema');
 const Verify = require('../models/verifySchema');
 // const CopyTrade = require('../models/CopyTrade');
@@ -3507,6 +3507,7 @@ c.activated_at=now;
 c.status='active';
 await c.save();
 await featureNotifyUser(c.user_id,'account','Card Approved',`Your ${c.card_type_id.name} card has been approved and is now active.`,'/user/notification.html',{icon:'bell'});
+try { const { sendPushToUser } = require('../utils/pushNotifications'); await sendPushToUser(c.user_id, { title: 'Card Approved', body: `Your ${c.card_type_id.name} card has been approved and is now active.`, url: '/user/cards.html', tag: 'card-approved' }); } catch (error) { console.error('Push notification failed:', error.message); }
 return featureLocalRedirect(res,'/admin/cards-view.html?id='+c._id,'card approved and issued successfully');
 });
 

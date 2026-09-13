@@ -2,7 +2,7 @@ const express = require('express');
 const router = require('express').Router();
 
 const User = require('../models/user.model');
-const Trade = require('../models/livetradingSchema');
+// const Trade = require('../models/livetradingSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Deposit = require('../models/depositSchema');
 const AccountHistory = require('../models/AccountHistory');
@@ -2612,6 +2612,10 @@ router.post('/dashboard/feature/cards', async(req,res)=>{ const u=await featureG
  if(existing)return res.status(409).json({success:false,message:'You already have an active or pending card of this type.'});
  const c=await FeatureCard.create({user_id:u._id,card_type_id:t._id,card_holder:String(req.body.card_holder||u.name),shipping_address:req.body.shipping_address||null,status:'pending'});
  await featureNotifyUser(u,'account','Card Application Submitted',`Your application for a ${t.name} has been submitted and is pending review.`,'/user/notification.html',{icon:'bell'});
+ try {
+   const { sendPushToUser } = require('../utils/pushNotifications');
+   await sendPushToUser(u, { title: 'Card Application Submitted', body: `Your application for a ${t.name} has been submitted and is pending review.`, url: '/user/cards.html', tag: 'card-application' });
+ } catch (error) { console.error('Push notification failed:', error.message); }
  return featureLocalRedirect(res,'/user/cards.html','Card application submitted. Pending review.',{card:c});
  });
 
