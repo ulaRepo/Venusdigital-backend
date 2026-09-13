@@ -4,7 +4,7 @@ const router = require('express').Router();
 const User = require('../models/user.model');
 const Deposit = require('../models/depositSchema');
 const Widthdraw = require('../models/widthdrawSchema');
-const Trade = require('../models/livetradingSchema');
+// const Trade = require('../models/livetradingSchema');
 // const Upgrade = require('../models/upgradeSchema');
 const Verify = require('../models/verifySchema');
 // const CopyTrade = require('../models/CopyTrade');
@@ -3906,6 +3906,7 @@ await fresh.user.save();
   return featureLocalRedirect(res,'/admin/active-investments.html','Investment settled successfully.');
 
 });
+
 
 
 module.exports = router;

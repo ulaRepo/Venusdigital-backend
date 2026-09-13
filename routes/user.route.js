@@ -2,7 +2,7 @@ const express = require('express');
 const router = require('express').Router();
 
 const User = require('../models/user.model');
-// const Trade = require('../models/livetradingSchema');
+const Trade = require('../models/livetradingSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Deposit = require('../models/depositSchema');
 const AccountHistory = require('../models/AccountHistory');
