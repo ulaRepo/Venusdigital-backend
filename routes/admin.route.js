@@ -3773,9 +3773,14 @@ return featureLocalRedirect(res,'/admin/assets.html','Asset deleted successfully
 });
 
 /* ---------------- ADMIN: mining ---------------- */
-router.get('/dashboard/feature/mining-plans',async(req,res)=>{const plans=await FeatureMiningPlan.find().sort({sort_order:1,createdAt:1}).lean();
+router.get('/dashboard/feature/mining-plans',async(req,res)=>{
+const plans=await FeatureMiningPlan.find().sort({sort_order:1,createdAt:1}).lean();
 const subs=await FeatureMiningSubscription.find().lean();
-return res.json({success:true,plans,stats:{totalPlans:plans.length,activePlans:plans.filter(x=>x.is_active).length,activeSubscribers:subs.filter(x=>x.status==='active').length,totalInvested:subs.filter(x=>x.status==='active').reduce((s,x)=>s+featureNum(x.invested_amount),0)}});
+const plansWithCounts=plans.map(p=>{
+  const count=subs.filter(s=>String(s.mining_plan_id)===String(p._id)).length;
+  return {...p, subscribers:count, subscriber_count:count};
+});
+return res.json({success:true,plans:plansWithCounts,stats:{totalPlans:plans.length,activePlans:plans.filter(x=>x.is_active).length,activeSubscribers:subs.filter(x=>x.status==='active').length,totalInvested:subs.filter(x=>x.status==='active').reduce((s,x)=>s+featureNum(x.invested_amount),0)}});
 });
 
 router.get('/dashboard/feature/mining-plans/:id',async(req,res)=>{const p=await FeatureMiningPlan.findById(req.params.id).lean();
@@ -3808,8 +3813,8 @@ router.delete('/dashboard/feature/mining-plans/:id',async(req,res)=>{await Featu
 return featureLocalRedirect(res,'/admin/mining-plans.html','mining plan deleted successfully');
 });
 
-router.get('/dashboard/feature/mining-subscriptions',async(req,res)=>{const subs=await FeatureMiningSubscription.find().populate('user_id','name email').populate('mining_plan_id').sort({createdAt:-1}).lean();
-return res.json({success:true,subscriptions:subs,stats:{active:subs.filter(x=>x.status==='active').length,totalInvested:subs.filter(x=>x.status==='active').reduce((s,x)=>s+featureNum(x.invested_amount),0),totalProfit:subs.reduce((s,x)=>s+featureNum(x.accumulated_profit),0)}});
+router.get('/dashboard/feature/mining-subscriptions',async(req,res)=>{const subs=await FeatureMiningSubscription.find().populate('user_id','name username email').populate('mining_plan_id').sort({createdAt:-1}).lean();
+return res.json({success:true,subscriptions:subs,stats:{active:subs.filter(x=>x.status==='active').length,totalInvested:subs.filter(x=>x.status==='active').reduce((s,x)=>s+featureNum(x.invested_amount),0),totalProfit:subs.reduce((s,x)=>s+featureNum(x.accumulated_profit),0),settled:subs.filter(x=>x.status==='settled').length}});
 });
 
 router.post('/dashboard/feature/mining-subscriptions/:id/settle',async(req,res)=>{const s=await FeatureMiningSubscription.findById(req.params.id).populate('user_id').populate('mining_plan_id');
@@ -3919,7 +3924,6 @@ await fresh.user.save();
   return featureLocalRedirect(res,'/admin/active-investments.html','Investment settled successfully.');
 
 });
-
 
 
 module.exports = router;
