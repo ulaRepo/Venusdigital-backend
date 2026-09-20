@@ -1107,7 +1107,14 @@ router.post('/dashboard/newdeposit', async (req, res) => {
 router.get('/dashboard/deposit-data', async (req, res) => {
   try {
     const filter = ownerFilter(Deposit, req.user._id);
-    const deposits = filter ? await Deposit.find(filter).sort({ createdAt: -1 }).lean() : [];
+    const allDeposits = filter ? await Deposit.find(filter).sort({ createdAt: -1 }).lean() : [];
+    // Loan repayment deposits must NOT appear on the deposits page history
+    const isLoanRep = (d) => {
+      if (d && (d.is_loan_repayment || d.loan_id)) return true;
+      const n = String(d?.narration || '').trim().toLowerCase();
+      return n.includes('loan repayment') || n.startsWith('loan repay');
+    };
+    const deposits = allDeposits.filter((d) => !isLoanRep(d));
     const history = await AccountHistory.find({ user_id: req.user._id }).sort({ date: -1, createdAt: -1 }).lean();
     const processedDeposits = deposits.filter((d) => statusValue(d) === 'processed').reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const pendingDeposits = deposits.filter((d) => statusValue(d) === 'pending').reduce((sum, d) => sum + Number(d.amount || 0), 0);
@@ -1122,15 +1129,26 @@ router.get('/dashboard/deposit-data', async (req, res) => {
   }
 });
 
+
 router.get('/dashboard/payment-data', async (req, res) => {
   try {
     const draft = req.session.depositDraft || null;
     if (!draft) return res.status(404).json({ success: false, message: 'No deposit payment session was found.' });
     const addresses = { Bitcoin: '1FsdggFaSzkDFkCZFtGWUFpL9EYHt9pg1T', Ethereum: '0xfa20E292a608e1828939BdFee258976c270e5c73', Litecoin: 'LMx8zXebD3khyFHKkmt9NhaJ1e7HA5B22Z', USDT: '0xfa20E292a608e1828939BdFee258976c270e5c73', Solana: '6nEHk142s3gXf1sYK3auzFKwKWbD24548D541qXfk2dq', XRP: 'rsNAwgyFkDrMWW21DpinDAHhVhSdj16Ynp', Hype: '', 'Bitcoin Cash': '', Chainlink: '', XLM: '', Avalanche: '', ADA: '', Atom: '' };
-    return res.json({ success: true, ...draft, address: addresses[draft.method] || '', currency_code: req.user.currency_code || 'USD' });
+    return res.json({
+      success: true,
+      ...draft,
+      address: addresses[draft.method] || addresses[String(draft.method||'').trim()] || '',
+      currency_code: (req.user && req.user.currency_code) || 'USD',
+      is_loan_repayment: !!(draft.loan_id),
+      loan_id: draft.loan_id || null,
+      installment: draft.installment || null,
+      narration: draft.narration || 'Deposit',
+      return_url: draft.return_url || '/user/deposits.html'
+    });
   } catch (error) {
     console.error('payment-data error:', error);
-    return res.status(500).json({ success: false, message: 'Could not load payment details' });
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -1182,15 +1200,19 @@ router.post('/dashboard/savedeposit', depositUpload.single('proof'), async (req,
 
         const proof = cloudUrl(req.file);
 
+        const isLoanDraft = !!(draft && draft.loan_id);
+        const minAmt = isLoanDraft ? 0.01 : 10;
         if (
             !Number.isFinite(amount) ||
-            amount < 10 ||
+            amount < minAmt ||
             !method ||
             !proof
         ) {
             return res.status(422).json({
                 success: false,
-                message: 'Deposit amount, payment method and payment proof are required.'
+                message: isLoanDraft
+                  ? 'Payment amount, method and proof are required.'
+                  : 'Deposit amount, payment method and payment proof are required.'
             });
         }
 
@@ -1228,7 +1250,7 @@ router.post('/dashboard/savedeposit', depositUpload.single('proof'), async (req,
             Deposit,
             data,
             ['narration'],
-            'Payment'
+            (draft.narration || draft.loan_id) ? (draft.narration || ('Loan repayment' + (draft.installment ? (' — Installment #' + draft.installment) : ''))) : 'Payment'
         );
 
         setModelField(
@@ -1237,6 +1259,13 @@ router.post('/dashboard/savedeposit', depositUpload.single('proof'), async (req,
             ['status'],
             'pending'
         );
+
+        if (draft && draft.loan_id) {
+            data.is_loan_repayment = true;
+            data.loan_id = draft.loan_id;
+            if (draft.schedule_id) data.schedule_id = String(draft.schedule_id);
+            if (draft.installment) data.installment = String(draft.installment);
+        }
 
         const deposit = await Deposit.create(data);
 
@@ -1259,10 +1288,19 @@ router.post('/dashboard/savedeposit', depositUpload.single('proof'), async (req,
             }
         );
 
+        // clear draft
+        try { delete req.session.depositDraft; } catch (_) {}
+
+        const isLoan = !!(draft && draft.loan_id);
+        const returnPath = (draft && draft.return_url) || (isLoan ? `/user/loans-details.html?id=${draft.loan_id}` : '/user/deposits.html?success=deposit');
+        const successMsg = isLoan
+          ? 'Loan repayment deposit submitted! Your payment will be applied once verified by admin.'
+          : 'Account Fund Sucessful! Please wait for system to validate this transaction.';
+
         return res.json({
             success: true,
-            message: 'Account Fund Sucessful! Please wait for system to validate this transaction.',
-            redirect: `${frontendUrl()}/user/deposits.html?success=deposit`
+            message: successMsg,
+            redirect: returnPath.startsWith('http') ? returnPath : `${frontendUrl()}${returnPath.startsWith('/') ? returnPath : '/' + returnPath}`
         });
 
     } catch (error) {
@@ -2840,5 +2878,668 @@ router.post('/dashboard/feature/trades', async(req,res)=>{
   }
 });
 
+
+
+const FeatureRealEstateProperty = require('../models/RealEstateProperty');
+const FeatureRealEstateInvestment = require('../models/RealEstateInvestment');
+const FeatureLoanPlan = require('../models/LoanPlan');
+const FeatureLoan = require('../models/Loan');
+
+function reAvailableTokens(p){
+  const total = featureNum(p.total_tokens);
+  const sold = featureNum(p.tokens_sold);
+  return Math.max(0, total - sold);
+}
+
+async function featureAccrueRealEstate(inv){
+  if(!inv || inv.status!=='active') return inv;
+  const now = Date.now();
+  if(inv.expires_at && new Date(inv.expires_at).getTime() <= now){
+    inv.status = 'expired';
+    await inv.save();
+    return inv;
+  }
+  const prop = inv.property_id && inv.property_id.roi_percentage != null ? inv.property_id : await FeatureRealEstateProperty.findById(inv.property_id);
+  if(!prop) return inv;
+  const last = inv.last_growth ? new Date(inv.last_growth).getTime() : new Date(inv.started_at).getTime();
+  const days = Math.floor((now - last) / 86400000);
+  if(days < 1) return inv;
+  const dailyRate = featureNum(prop.roi_percentage) / 100 / 365;
+  inv.profit_earned = featureNum(inv.profit_earned) + featureNum(inv.amount) * dailyRate * days;
+  inv.last_growth = new Date();
+  await inv.save();
+  return inv;
+}
+
+router.get('/dashboard/feature/real-estate', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const properties = await FeatureRealEstateProperty.find({ is_active:true, status:'Active' }).sort({ createdAt:-1 }).lean();
+    const list = properties.map(p=>({
+      ...p,
+      available_tokens: reAvailableTokens(p),
+      photo_count: 1 + (Array.isArray(p.room_images)?p.room_images.filter(Boolean).length:0)
+    }));
+    return res.json({ success:true, properties:list, balance: featureNum(u.account_bal) });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.get('/dashboard/feature/real-estate/:id', async(req,res)=>{
+  try{
+    const p = await FeatureRealEstateProperty.findById(req.params.id).lean();
+    if(!p) return res.status(404).json({success:false,message:'Property not found.'});
+    return res.json({ success:true, property:{ ...p, available_tokens: reAvailableTokens(p) } });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.post('/dashboard/feature/real-estate/invest', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const b = req.body || {};
+    const p = await FeatureRealEstateProperty.findOne({ _id: b.property_id, is_active:true, status:'Active' });
+    if(!p) return res.status(404).json({success:false,message:'Property not found.'});
+    const amount = featureNum(b.amount);
+    if(amount < featureNum(p.min_investment)) return res.status(422).json({success:false,message:`Minimum investment is $${featureNum(p.min_investment).toFixed(2)}.`});
+    if(featureNum(p.max_investment) > 0 && amount > featureNum(p.max_investment)) return res.status(422).json({success:false,message:`Maximum investment is $${featureNum(p.max_investment).toFixed(2)}.`});
+    if(amount > featureNum(u.account_bal)) return res.status(422).json({success:false,message:'Insufficient balance.'});
+    const tokenPrice = featureNum(p.token_price) || 1;
+    const tokens = Math.floor(amount / tokenPrice);
+    if(tokens < 1) return res.status(422).json({success:false,message:'Amount too low for one token.'});
+    const available = reAvailableTokens(p);
+    if(tokens > available) return res.status(422).json({success:false,message:`Only ${available} tokens available.`});
+    u.account_bal = featureNum(u.account_bal) - amount;
+    await u.save();
+    p.tokens_sold = featureNum(p.tokens_sold) + tokens;
+    await p.save();
+    const now = new Date();
+    const inv = await FeatureRealEstateInvestment.create({
+      user_id: u._id,
+      property_id: p._id,
+      amount,
+      tokens,
+      profit_earned: 0,
+      status: 'active',
+      started_at: now,
+      expires_at: new Date(now.getTime() + featureNum(p.duration_days, 365) * 86400000),
+      last_growth: now
+    });
+    try{
+      await featureNotifyUser(u, 'trade', 'Real Estate Investment', `You invested $${amount.toFixed(2)} in ${p.name}.`, '/user/notification.html', { icon:'bell' });
+    }catch(_){}
+    try{
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      await sendPushToUser(u, { title:'Real Estate Investment', body:`You invested $${amount.toFixed(2)} in ${p.name}.`, url:'/user/my-real-estate.html', tag:'real-estate-invest' });
+    }catch(_){}
+    return res.json({
+      success:true,
+      message:`Investment successful! You now own ${tokens} tokens in ${p.name}.`,
+      investment: inv,
+      redirect: '/user/my-real-estate.html'
+    });
+  }catch(e){
+    console.error(e);
+    return res.status(500).json({success:false,message:e.message});
+  }
+});
+
+router.get('/dashboard/feature/my-real-estate', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    let invs = await FeatureRealEstateInvestment.find({ user_id: u._id }).populate('property_id').sort({ createdAt:-1 });
+    for(const inv of invs.filter(x=>x.status==='active')){
+      await featureAccrueRealEstate(inv);
+    }
+    invs = await FeatureRealEstateInvestment.find({ user_id: u._id }).populate('property_id').sort({ createdAt:-1 }).lean();
+    const active = invs.filter(x=>x.status==='active');
+    return res.json({
+      success:true,
+      investments: invs,
+      stats: {
+        totalInvested: active.reduce((s,x)=>s+featureNum(x.amount),0),
+        totalProfit: invs.reduce((s,x)=>s+featureNum(x.profit_earned),0),
+        active: active.length
+      }
+    });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.post('/dashboard/feature/real-estate/cancel/:id', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const inv = await FeatureRealEstateInvestment.findOne({ _id: req.params.id, user_id: u._id, status:'active' }).populate('property_id');
+    if(!inv) return res.status(404).json({success:false,message:'Investment not found.'});
+    await featureAccrueRealEstate(inv);
+    const refund = featureNum(inv.amount) + featureNum(inv.profit_earned);
+    inv.status = 'cancelled';
+    inv.cancelled_at = new Date();
+    await inv.save();
+    u.account_bal = featureNum(u.account_bal) + refund;
+    await u.save();
+    if(inv.property_id){
+      const p = await FeatureRealEstateProperty.findById(inv.property_id._id || inv.property_id);
+      if(p){
+        p.tokens_sold = Math.max(0, featureNum(p.tokens_sold) - featureNum(inv.tokens));
+        await p.save();
+      }
+    }
+    const pname = inv.property_id?.name || 'property';
+    try{
+      await featureNotifyUser(u, 'trade', 'Real Estate Cancelled', `Your investment in ${pname} was cancelled. $${refund.toFixed(2)} returned to your balance.`, '/user/notification.html', { icon:'bell' });
+    }catch(_){}
+    return res.json({ success:true, message:'Investment cancelled. Capital returned to your account.' });
+  }catch(e){
+    console.error(e);
+    return res.status(500).json({success:false,message:e.message});
+  }
+});
+
+
+
+/* ===== LOAN FEATURE (user) ===== */
+function loanBuildSchedule(amount, months, annualRate, interestType){
+  const n = Math.max(1, Math.floor(months));
+  const principal = featureNum(amount);
+  const r = featureNum(annualRate) / 100;
+  const schedule = [];
+  let totalInterest = 0;
+  if(String(interestType).toLowerCase() === 'compound'){
+    const monthlyRate = r / 12;
+    const payment = monthlyRate === 0 ? principal / n : (principal * monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
+    let balance = principal;
+    for(let i=1;i<=n;i++){
+      const interest = balance * monthlyRate;
+      let prin = payment - interest;
+      if(i === n) prin = balance;
+      const total = prin + interest;
+      totalInterest += interest;
+      balance = Math.max(0, balance - prin);
+      const due = new Date(); due.setMonth(due.getMonth() + i);
+      schedule.push({ due_date: due, principal: Math.round(prin*100)/100, interest: Math.round(interest*100)/100, total: Math.round(total*100)/100, late_fee: 0, status: 'upcoming' });
+    }
+  } else {
+    const totalInterestAll = principal * r * (n / 12);
+    const interestPer = totalInterestAll / n;
+    const prinPer = principal / n;
+    totalInterest = totalInterestAll;
+    for(let i=1;i<=n;i++){
+      const due = new Date(); due.setMonth(due.getMonth() + i);
+      schedule.push({ due_date: due, principal: Math.round(prinPer*100)/100, interest: Math.round(interestPer*100)/100, total: Math.round((prinPer+interestPer)*100)/100, late_fee: 0, status: 'upcoming' });
+    }
+  }
+  const totalRepayable = schedule.reduce((s,x)=>s+featureNum(x.total),0);
+  return { schedule, totalInterest, totalRepayable };
+}
+
+router.get('/dashboard/feature/loan-plans', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const plans = await FeatureLoanPlan.find({ is_active:true, status:'Active' }).sort({ createdAt:-1 }).lean();
+    return res.json({ success:true, plans, balance: featureNum(u.account_bal) });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.post('/dashboard/feature/loans/preview', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const plan = await FeatureLoanPlan.findById(req.body.plan_id).lean();
+    if(!plan) return res.status(404).json({success:false,message:'Plan not found.'});
+    const amount = featureNum(req.body.amount);
+    const months = featureNum(req.body.duration_months, plan.min_duration);
+    const fee = amount * (featureNum(plan.processing_fee)/100);
+    const built = loanBuildSchedule(amount, months, plan.interest_rate, plan.interest_type);
+    return res.json({
+      success:true,
+      preview:{
+        amount, months, fee: Math.round(fee*100)/100,
+        interest: Math.round(built.totalInterest*100)/100,
+        total_repayable: Math.round((built.totalRepayable + fee)*100)/100,
+        schedule: built.schedule
+      },
+      balance: featureNum(u.account_bal)
+    });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.post('/dashboard/feature/loans/apply', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const b = req.body || {};
+    const plan = await FeatureLoanPlan.findOne({ _id: b.plan_id, is_active:true, status:'Active' });
+    if(!plan) return res.status(404).json({success:false,message:'Plan not found.'});
+    const amount = featureNum(b.amount);
+    const months = Math.floor(featureNum(b.duration_months, plan.min_duration));
+    if(amount < featureNum(plan.min_amount) || amount > featureNum(plan.max_amount))
+      return res.status(422).json({success:false,message:`Amount must be between $${featureNum(plan.min_amount)} and $${featureNum(plan.max_amount)}.`});
+    if(months < featureNum(plan.min_duration) || months > featureNum(plan.max_duration))
+      return res.status(422).json({success:false,message:`Duration must be between ${plan.min_duration} and ${plan.max_duration} months.`});
+    if(featureNum(u.account_bal) < featureNum(plan.min_account_balance))
+      return res.status(422).json({success:false,message:`Minimum account balance of $${featureNum(plan.min_account_balance)} required.`});
+    const activeCount = await FeatureLoan.countDocuments({ user_id: u._id, plan_id: plan._id, status: { $in: ['pending','active','repaying'] } });
+    if(activeCount >= featureNum(plan.max_active_loans, 1))
+      return res.status(422).json({success:false,message:'Maximum active loans of this type reached.'});
+    const loan = await FeatureLoan.create({
+      user_id: u._id,
+      plan_id: plan._id,
+      amount,
+      duration_months: months,
+      purpose: String(b.purpose||'').trim(),
+      monthly_income: featureNum(b.monthly_income),
+      interest_rate: featureNum(plan.interest_rate),
+      interest_type: plan.interest_type,
+      processing_fee: Math.round(amount * (featureNum(plan.processing_fee)/100)*100)/100,
+      status: 'pending',
+      applied_at: new Date()
+    });
+    try{
+      await Notification.create({ user_id: u._id, title: 'Loan Application Submitted', message: `Your loan application for $${amount.toFixed(2)} is pending review.`, type: 'loan', link: '/user/my-loans.html' });
+    }catch(_){}
+    try{
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      await sendPushToUser(u, { title: 'Loan Application Submitted', body: `Your loan application for $${amount.toFixed(2)} is pending review.`, url: '/user/my-loans.html', tag: 'loan-apply' });
+    }catch(_){}
+    return res.json({ success:true, message: 'Loan application submitted successfully.', loan, redirect: '/user/my-loans.html' });
+  }catch(e){ console.error(e); return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.get('/dashboard/feature/my-loans', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const loans = await FeatureLoan.find({ user_id: u._id }).populate('plan_id').sort({ createdAt:-1 }).lean();
+    const active = loans.filter(x=>['active','repaying'].includes(x.status));
+    const pending = loans.filter(x=>x.status==='pending');
+    const totalBorrowed = loans.filter(x=>['active','repaying','completed','defaulted'].includes(x.status)).reduce((s,x)=>s+featureNum(x.approved_amount||x.amount),0);
+    const totalRepaid = loans.reduce((s,x)=>s+featureNum(x.total_repaid),0);
+    return res.json({
+      success:true,
+      loans,
+      stats: { active: active.length, pending: pending.length, totalBorrowed, totalRepaid }
+    });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.get('/dashboard/feature/loans/:id', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const loan = await FeatureLoan.findOne({ _id: req.params.id, user_id: u._id }).populate('plan_id').lean();
+    if(!loan) return res.status(404).json({success:false,message:'Loan not found.'});
+    // mark overdue schedule items
+    const now = Date.now();
+    if(Array.isArray(loan.schedule)){
+      loan.schedule = loan.schedule.map(item=>{
+        if(item.status==='upcoming' && item.due_date && new Date(item.due_date).getTime() < now){
+          return { ...item, status: 'overdue' };
+        }
+        return item;
+      });
+    }
+    const total = featureNum(loan.total_repayable);
+    const paid = featureNum(loan.total_repaid);
+    const remaining = Math.max(0, total - paid);
+    const pct = total > 0 ? Math.min(100, (paid/total)*100) : 0;
+    const next = (loan.schedule||[]).find(x=>x.status==='upcoming'||x.status==='overdue');
+    return res.json({
+      success:true,
+      loan,
+      progress: { paid, remaining, total, pct },
+      nextPayment: next || null,
+      balance: featureNum(u.account_bal)
+    });
+  }catch(e){ return res.status(500).json({success:false,message:e.message}); }
+});
+
+
+router.post('/dashboard/feature/loans/:id/repay', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const loan = await FeatureLoan.findOne({ _id: req.params.id, user_id: u._id });
+    if(!loan) return res.status(404).json({success:false,message:'Loan not found.'});
+    if(!['active','repaying'].includes(loan.status))
+      return res.status(422).json({success:false,message:'Loan is not repayable.'});
+    const scheduleId = req.body.schedule_id;
+    const amount = featureNum(req.body.amount);
+    let item = null;
+    let idx = -1;
+    if(scheduleId != null && scheduleId !== ''){
+      idx = loan.schedule.findIndex((s,i)=> String(s._id)===String(scheduleId) || String(i+1)===String(scheduleId) || String(i)===String(scheduleId));
+      if(idx >= 0) item = loan.schedule[idx];
+    }
+    if(!item){
+      idx = loan.schedule.findIndex(s=> s.status==='upcoming' || s.status==='overdue');
+      if(idx >= 0) item = loan.schedule[idx];
+    }
+    if(!item) return res.status(422).json({success:false,message:'No payable installment found.'});
+    const due = amount > 0 ? amount : featureNum(item.total) + featureNum(item.late_fee);
+    if(due <= 0) return res.status(422).json({success:false,message:'Invalid amount.'});
+    if(featureNum(u.account_bal) < due)
+      return res.status(422).json({success:false,message:'Insufficient account balance.'});
+    u.account_bal = featureNum(u.account_bal) - due;
+    await u.save();
+    item.status = 'paid';
+    item.paid_at = new Date();
+    item.paid_amount = due;
+    loan.markModified('schedule');
+    loan.total_repaid = featureNum(loan.total_repaid) + due;
+    if(loan.status === 'active') loan.status = 'repaying';
+    const allPaid = loan.schedule.every(s=> s.status==='paid');
+    if(allPaid) loan.status = 'completed';
+    await loan.save();
+    try{
+      await Notification.create({
+        user_id: u._id,
+        title: 'Loan Repayment Recorded',
+        message: `Payment of $${due.toFixed(2)} recorded successfully.`,
+        type: 'loan',
+        link: '/user/loans-details.html?id='+loan._id
+      });
+    }catch(_){}
+    try{
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      await sendPushToUser(u, {
+        title: 'Loan Repayment Recorded',
+        body: `Payment of $${due.toFixed(2)} recorded successfully.`,
+        url: '/user/loans-details.html?id='+loan._id,
+        tag: 'loan-repay'
+      });
+    }catch(_){}
+    return res.json({
+      success:true,
+      message: `Payment of $${due.toFixed(2)} recorded successfully.`,
+      loan
+    });
+  }catch(e){ console.error(e); return res.status(500).json({success:false,message:e.message}); }
+});
+
+router.post('/dashboard/feature/loans/:id/repay-deposit', async(req,res)=>{
+  try{
+    const u = await featureGetUser(req);
+    if(!u) return res.status(401).json({success:false,message:'Authentication required.'});
+    const loan = await FeatureLoan.findOne({ _id: req.params.id, user_id: u._id });
+    if(!loan) return res.status(404).json({success:false,message:'Loan not found.'});
+    const amount = featureNum(req.body.amount);
+    const method = String(req.body.method || req.body.payment_method || '').trim();
+    const schedule_id = req.body.schedule_id != null ? String(req.body.schedule_id) : '';
+    const installment = String(req.body.installment || req.body.installment_index || '').trim();
+    if(amount <= 0) return res.status(422).json({success:false,message:'Invalid amount.'});
+    if(!method) return res.status(422).json({success:false,message:'Select a payment method.'});
+    // Same flow as normal deposit: store draft in session → user completes payment on payment.html
+    req.session.depositDraft = {
+      amount,
+      method,
+      createdAt: Date.now(),
+      loan_id: String(loan._id),
+      schedule_id,
+      installment,
+      narration: installment
+        ? `Loan repayment — Installment #${installment}`
+        : `Loan repayment — Loan #${String(loan._id).slice(-4)}`,
+      return_url: `/user/loans-details.html?id=${loan._id}`
+    };
+    return res.json({
+      success: true,
+      amount,
+      method,
+      redirect: '/user/payment.html',
+      message: 'Continue to payment page'
+    });
+  }catch(e){ console.error(e); return res.status(500).json({success:false,message:e.message}); }
+});
+
+
+// ===================== STOCK SHARES FEATURE =====================
+const FeatureStockPosition = require('../models/StockPosition');
+const FeatureStockTrade = require('../models/StockTrade');
+
+function stockAssetFilter() {
+  return { asset_class: { $in: ['stock', 'stocks'] }, is_active: { $ne: false } };
+}
+
+function stockPL(shares, avgCost, price) {
+  const invested = Number(shares || 0) * Number(avgCost || 0);
+  const value = Number(shares || 0) * Number(price || 0);
+  const pl = value - invested;
+  const pct = invested > 0 ? (pl / invested) * 100 : 0;
+  return { invested, value, pl, pct };
+}
+
+router.get('/dashboard/feature/stocks', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const q = String(req.query.q || '').trim();
+    const filter = stockAssetFilter();
+    if (q) {
+      filter.$or = [
+        { symbol: new RegExp(q, 'i') },
+        { name: new RegExp(q, 'i') }
+      ];
+    }
+    const assets = await FeatureTradingAsset.find(filter).sort({ symbol: 1 }).lean();
+    return res.json({ success: true, stocks: assets, balance: featureNum(u.account_bal) });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/stocks/portfolio', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const positions = await FeatureStockPosition.find({ user_id: u._id, status: 'open', shares: { $gt: 0 } }).lean();
+    const symbols = [...new Set(positions.map(p => p.symbol))];
+    const assets = await FeatureTradingAsset.find({ symbol: { $in: symbols } }).lean();
+    const bySym = Object.fromEntries(assets.map(a => [a.symbol, a]));
+    let totalInvested = 0, currentValue = 0, totalPl = 0;
+    const rows = positions.map(p => {
+      const a = bySym[p.symbol] || {};
+      const price = featureNum(a.price || p.avg_cost);
+      const m = stockPL(p.shares, p.avg_cost, price);
+      totalInvested += m.invested;
+      currentValue += m.value;
+      totalPl += m.pl;
+      return {
+        ...p,
+        current_price: price,
+        market_value: m.value,
+        pl: m.pl,
+        pl_pct: m.pct,
+        logo_url: p.logo_url || a.logo_url || '',
+        name: p.name || a.name || p.symbol,
+        asset_id: p.asset_id || a._id
+      };
+    });
+    return res.json({
+      success: true,
+      stats: { totalInvested, currentValue, totalPl },
+      positions: rows,
+      balance: featureNum(u.account_bal)
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/stocks/history', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const type = String(req.query.type || 'all').toUpperCase();
+    const filter = { user_id: u._id };
+    if (type === 'BUY' || type === 'SELL') filter.type = type;
+    const trades = await FeatureStockTrade.find(filter).sort({ createdAt: -1 }).limit(200).lean();
+    return res.json({ success: true, trades });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/stocks/:id', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const id = req.params.id;
+    let asset = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) asset = await FeatureTradingAsset.findById(id).lean();
+    if (!asset) asset = await FeatureTradingAsset.findOne({ symbol: String(id).toUpperCase(), asset_class: { $in: ['stock', 'stocks'] } }).lean();
+    if (!asset) return res.status(404).json({ success: false, message: 'Stock not found.' });
+    const position = await FeatureStockPosition.findOne({ user_id: u._id, symbol: asset.symbol, status: 'open' }).lean();
+    const price = featureNum(asset.price);
+    let posView = null;
+    if (position && position.shares > 0) {
+      const m = stockPL(position.shares, position.avg_cost, price);
+      posView = { ...position, current_price: price, market_value: m.value, pl: m.pl, pl_pct: m.pct };
+    }
+    const recent = await FeatureStockTrade.find({ user_id: u._id, symbol: asset.symbol }).sort({ createdAt: -1 }).limit(10).lean();
+    return res.json({
+      success: true,
+      stock: asset,
+      position: posView,
+      recentTrades: recent,
+      balance: featureNum(u.account_bal)
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/stocks/:id/buy', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const id = req.params.id;
+    let asset = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) asset = await FeatureTradingAsset.findById(id);
+    if (!asset) asset = await FeatureTradingAsset.findOne({ symbol: String(id).toUpperCase() });
+    if (!asset) return res.status(404).json({ success: false, message: 'Stock not found.' });
+    const amount = featureNum(req.body.amount);
+    const price = featureNum(asset.price);
+    if (amount <= 0) return res.status(422).json({ success: false, message: 'Enter a valid amount.' });
+    if (price <= 0) return res.status(422).json({ success: false, message: 'Stock price unavailable.' });
+    if (featureNum(u.account_bal) < amount) return res.status(422).json({ success: false, message: 'Insufficient balance.' });
+    const shares = amount / price;
+    const fee = 0;
+    u.account_bal = featureNum(u.account_bal) - amount - fee;
+    await u.save();
+    let pos = await FeatureStockPosition.findOne({ user_id: u._id, symbol: asset.symbol, status: 'open' });
+    if (!pos) {
+      pos = await FeatureStockPosition.create({
+        user_id: u._id,
+        asset_id: asset._id,
+        symbol: asset.symbol,
+        name: asset.name,
+        logo_url: asset.logo_url || '',
+        shares,
+        avg_cost: price,
+        total_invested: amount,
+        status: 'open'
+      });
+    } else {
+      const newShares = featureNum(pos.shares) + shares;
+      const newInvested = featureNum(pos.total_invested) + amount;
+      pos.avg_cost = newShares > 0 ? newInvested / newShares : price;
+      pos.shares = newShares;
+      pos.total_invested = newInvested;
+      pos.name = asset.name;
+      pos.logo_url = asset.logo_url || pos.logo_url;
+      await pos.save();
+    }
+    await FeatureStockTrade.create({
+      user_id: u._id,
+      asset_id: asset._id,
+      position_id: pos._id,
+      symbol: asset.symbol,
+      name: asset.name,
+      logo_url: asset.logo_url || '',
+      type: 'BUY',
+      shares,
+      price,
+      total: amount,
+      fee
+    });
+    try {
+      await Notification.create({
+        user_id: u._id,
+        title: 'Stock Purchase',
+        message: `Bought ${shares.toFixed(4)} ${asset.symbol} for $${amount.toFixed(2)}`,
+        type: 'stock',
+        link: '/user/stock-portfolio.html'
+      });
+    } catch (_) {}
+    return res.json({ success: true, message: `Bought ${shares.toFixed(4)} shares of ${asset.symbol}`, position: pos });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/stocks/:id/sell', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const id = req.params.id;
+    let asset = null;
+    if (id.match(/^[0-9a-fA-F]{24}$/)) asset = await FeatureTradingAsset.findById(id);
+    if (!asset) asset = await FeatureTradingAsset.findOne({ symbol: String(id).toUpperCase() });
+    if (!asset) return res.status(404).json({ success: false, message: 'Stock not found.' });
+    const pos = await FeatureStockPosition.findOne({ user_id: u._id, symbol: asset.symbol, status: 'open' });
+    if (!pos || featureNum(pos.shares) <= 0) return res.status(422).json({ success: false, message: 'No open position to sell.' });
+    const price = featureNum(asset.price);
+    if (price <= 0) return res.status(422).json({ success: false, message: 'Stock price unavailable.' });
+    let shares = featureNum(req.body.shares);
+    const amountIn = featureNum(req.body.amount);
+    if (shares <= 0 && amountIn > 0) shares = amountIn / price;
+    if (shares <= 0) return res.status(422).json({ success: false, message: 'Enter shares or amount to sell.' });
+    if (shares > featureNum(pos.shares) + 1e-8) return res.status(422).json({ success: false, message: 'Not enough shares.' });
+    shares = Math.min(shares, featureNum(pos.shares));
+    const total = shares * price;
+    const fee = 0;
+    const costBasis = shares * featureNum(pos.avg_cost);
+    const pl = total - costBasis;
+    u.account_bal = featureNum(u.account_bal) + total - fee;
+    await u.save();
+    pos.shares = featureNum(pos.shares) - shares;
+    pos.total_invested = Math.max(0, featureNum(pos.total_invested) - costBasis);
+    if (pos.shares <= 1e-8) {
+      pos.shares = 0;
+      pos.total_invested = 0;
+      pos.status = 'closed';
+      pos.closed_pl = featureNum(pos.closed_pl) + pl;
+    }
+    await pos.save();
+    await FeatureStockTrade.create({
+      user_id: u._id,
+      asset_id: asset._id,
+      position_id: pos._id,
+      symbol: asset.symbol,
+      name: asset.name,
+      logo_url: asset.logo_url || '',
+      type: 'SELL',
+      shares,
+      price,
+      total,
+      fee
+    });
+    try {
+      await Notification.create({
+        user_id: u._id,
+        title: 'Stock Sale',
+        message: `Sold ${shares.toFixed(4)} ${asset.symbol} for $${total.toFixed(2)} (P/L ${pl >= 0 ? '+' : ''}$${pl.toFixed(2)})`,
+        type: 'stock',
+        link: '/user/stock-history.html'
+      });
+    } catch (_) {}
+    return res.json({ success: true, message: `Sold ${shares.toFixed(4)} shares of ${asset.symbol}`, pl });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 module.exports = router;

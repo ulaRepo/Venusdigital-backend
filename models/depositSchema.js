@@ -12,6 +12,11 @@ const depositSchema = new mongoose.Schema({
   image: { type: String, default: '' },
   proof: { type: String, default: '' },
   narration: { type: String, default: 'Deposit' },
+  // Loan repayment linkage (excluded from normal deposit history)
+  loan_id: { type: mongoose.Schema.Types.ObjectId, ref: 'Loan', default: null, index: true },
+  schedule_id: { type: String, default: '' },
+  installment: { type: String, default: '' },
+  is_loan_repayment: { type: Boolean, default: false, index: true },
 }, { timestamps: true });
 
 depositSchema.index({ user: 1, createdAt: -1 });
