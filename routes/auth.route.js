@@ -1,14 +1,13 @@
 const router = require('express').Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { Resend } = require('resend');
 const { validationResult } = require('express-validator');
 const User = require('../models/user.model');
 const { registerValidator } = require('../utils/validators');
 const { createToken, maxAge, JWT_SECRET, requireAuth } = require('../utils/authMiddleware');
 const { getPushConfig, sendPushToUser } = require('../utils/pushNotifications');
+const { sendMail, isEmailConfigured, FROM_EMAIL: EMAIL_FROM } = require('../utils/email');
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || 'support@example.com';
 const BRAND_WEBSITE_URL = String(process.env.BRAND_WEBSITE_URL || process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
 const BRAND_LOGO_URL = process.env.BRAND_LOGO_URL || `${String(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/storage/app/public/photos/DjH2X9jdLXAgNMV4LJyhCMJ34SrNFTDSlxA6Qk7I.png`;
@@ -305,9 +304,9 @@ router.post('/register', registerValidator, async (req, res, next) => {
       gender, country: normalizedCountry, currency_code: normalizedCurrency, password, account: accounts,
       balance: 0, account_bal: 0, status: 'active', verificationStatus: 'not_verified', account_verify: 'Not Verified'
     });
-    if (resend) {
+    if (isEmailConfigured()) {
       try {
-        await resend.emails.send({ from: FROM_EMAIL, to: user.email, subject: 'Welcome to Digital-grownt', html: welcomeEmailHtml({ name: user.name }) });
+        await sendMail(user.email, 'Welcome to Digital-grownt', welcomeEmailHtml({ name: user.name }));
       } catch (mailError) {
         console.error('Welcome email error:', mailError.message);
       }
@@ -337,11 +336,11 @@ router.post('/forgot-password', async (req, res, next) => {
     user.resetPasswordToken = crypto.createHash('sha256').update(raw).digest('hex');
     user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
-    if (!resend) return res.status(503).json({ success: false, message: 'Email delivery is not configured' });
+    if (!isEmailConfigured()) return res.status(503).json({ success: false, message: 'Email delivery is not configured' });
 
     const resetUrl = frontendUrl() + '/reset-password.html?token=' + encodeURIComponent(raw) + '&email=' + encodeURIComponent(user.email);
     try {
-      await resend.emails.send({ from: FROM_EMAIL, to: user.email, subject: 'Reset your Digital-grownt password', html: resetEmailHtml({ name: user.name, resetUrl }) });
+      await sendMail(user.email, 'Reset your Digital-grownt password', resetEmailHtml({ name: user.name, resetUrl }));
     } catch (mailError) {
       user.resetPasswordToken = undefined;
       user.resetPasswordExpires = undefined;

@@ -11,7 +11,6 @@ const Verify = require('../models/verifySchema');
 // const Affliate = require('../models/affiliate');
 // const Wallet = require('../models/walletAddress');
 const bcrypt = require('bcrypt');
-const { Resend } = require('resend');
 const AccountHistory = require('../models/AccountHistory');
 const Notification = require('../models/Notification');
 const { notifyUser } = require('../services/notification.service');
@@ -414,8 +413,7 @@ router.get('/dashboard/adminprofile', (req, res) => {
 
 
 // ===================== FUNCTIONAL USER MANAGEMENT OVERRIDES =====================
-const adminResend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const adminFrom = process.env.FROM_EMAIL || 'support@digital-grownt.com';
+const { sendMail, isEmailConfigured, FROM_EMAIL: adminFrom } = require('../utils/email');
 
 function wantsJson(req) {
   return String(req.get('accept') || '').includes('application/json') || req.xhr || req.body?._ajax === '1';
@@ -753,8 +751,8 @@ router.post('/dashboard/sendmailsingle', async (req, res) => {
     const subject = String(req.body.subject || '').trim();
     const message = String(req.body.message || '').trim();
     if (!user || !subject || !message) return res.status(422).json({ success: false, message: 'Recipient, subject and message are required' });
-    if (adminResend) {
-      await adminResend.emails.send({ from: adminFrom, to: user.email, subject, html: `
+    if (isEmailConfigured()) {
+      await sendMail(user.email, subject, `
         <div style="margin:0;background:#f4f7f8;padding:32px 16px;font-family:Arial,sans-serif;color:#17202a">
           <div style="max-width:620px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e7ecef">
             <div style="background:#0052ff;padding:26px;text-align:center"><img src="${process.env.BRAND_LOGO_URL || ''}" alt="Digital-grownt" style="max-height:52px;max-width:220px"></div>
@@ -762,7 +760,7 @@ router.post('/dashboard/sendmailsingle', async (req, res) => {
               <p style="margin:28px 0 0;text-align:center"><a href="${String(process.env.FRONTEND_URL || '').replace(/\/$/,'')}/user/notification.html" style="display:inline-block;background:#0052ff;color:#fff;padding:13px 22px;border-radius:9px;text-decoration:none;font-weight:700">View message on dashboard</a></p>
             </div>
           </div>
-        </div>` });
+        </div>`);
     }
     await notifyUser(user, 'message', subject, message, '/user/notification.html', { icon: 'bell', tag: `admin-message-${Date.now()}` });
     return adminResult(req, res, 'Your message was sent successfully!');

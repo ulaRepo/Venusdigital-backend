@@ -2,7 +2,7 @@ const express = require('express');
 const router = require('express').Router();
 
 const User = require('../models/user.model');
-const Trade = require('../models/livetradingSchema');
+// const Trade = require('../models/livetradingSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Deposit = require('../models/depositSchema');
 const AccountHistory = require('../models/AccountHistory');
@@ -16,6 +16,11 @@ const Notification = require('../models/Notification');
 // ===================== FEATURE ROUTES =====================
 const crypto = require('crypto');
 const FeatureTradingAsset = require('../models/TradingAsset');
+const Course = require('../models/Course');
+const Lesson = require('../models/Lesson');
+const CourseCategory = require('../models/CourseCategory');
+const CourseEnrollment = require('../models/CourseEnrollment');
+
 const FeatureWalletConnection = require('../models/WalletConnection');
 const FeatureWalletSettings = require('../models/WalletSettings');
 const FeaturePlans = require('../models/Plans');
@@ -3539,6 +3544,143 @@ router.post('/dashboard/feature/stocks/:id/sell', async (req, res) => {
     return res.json({ success: true, message: `Sold ${shares.toFixed(4)} shares of ${asset.symbol}`, pl });
   } catch (e) {
     return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+// ===== COURSES FEATURE (user) =====
+router.get('/dashboard/feature/courses', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const courses = await Course.find({ status: 'published' }).sort({ createdAt: -1 }).lean();
+    const enrolled = await CourseEnrollment.find({ user_id: u._id }).lean();
+    const enrolledSet = new Set(enrolled.map(e => String(e.course_id)));
+    const ids = courses.map(c => c._id);
+    const lessons = await Lesson.find({ course_id: { $in: ids } }).lean();
+    const lessonCount = {};
+    lessons.forEach(l => {
+      const k = String(l.course_id);
+      lessonCount[k] = (lessonCount[k] || 0) + 1;
+    });
+    const list = courses.map(c => ({
+      ...c,
+      lessons_count: lessonCount[String(c._id)] || c.lessons_count || 0,
+      enrolled: enrolledSet.has(String(c._id)),
+      cover: c.image || c.image_url || '',
+    }));
+    res.json({ success: true, courses: list, balance: Number(u.account_bal || 0) });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/courses/my', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const enrolled = await CourseEnrollment.find({ user_id: u._id }).sort({ createdAt: -1 }).lean();
+    const ids = enrolled.map(e => e.course_id);
+    const courses = await Course.find({ _id: { $in: ids } }).lean();
+    const byId = Object.fromEntries(courses.map(c => [String(c._id), c]));
+    const lessons = await Lesson.find({ course_id: { $in: ids } }).lean();
+    const lessonCount = {};
+    lessons.forEach(l => {
+      const k = String(l.course_id);
+      lessonCount[k] = (lessonCount[k] || 0) + 1;
+    });
+    const list = enrolled.map(e => {
+      const c = byId[String(e.course_id)] || {};
+      return {
+        enrollment_id: e._id,
+        enrolled_at: e.createdAt,
+        amount_paid: e.amount_paid,
+        ...c,
+        lessons_count: lessonCount[String(c._id)] || 0,
+        cover: c.image || c.image_url || '',
+      };
+    }).filter(x => x._id);
+    res.json({ success: true, courses: list });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/courses/:id', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const id = req.params.id;
+    let course = null;
+    if (String(id).match(/^[0-9a-fA-F]{24}$/)) course = await Course.findById(id).lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found.' });
+    const lessons = await Lesson.find({ course_id: course._id }).sort({ order: 1, createdAt: 1 }).lean();
+    const enrolledDoc = await CourseEnrollment.findOne({ user_id: u._id, course_id: course._id }).lean();
+    res.json({
+      success: true,
+      course: { ...course, cover: course.image || course.image_url || '', lessons_count: lessons.length },
+      lessons,
+      enrolled: !!enrolledDoc,
+      balance: Number(u.account_bal || 0),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/courses/:id/buy', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const course = await Course.findById(req.params.id);
+    if (!course || course.status !== 'published') return res.status(404).json({ success: false, message: 'Course not available.' });
+    const existing = await CourseEnrollment.findOne({ user_id: u._id, course_id: course._id });
+    if (existing) return res.json({ success: true, message: 'Already enrolled.', enrolled: true });
+    const price = Number(course.price || 0);
+    if (price > 0) {
+      if (Number(u.account_bal || 0) < price) {
+        return res.status(422).json({ success: false, message: 'Insufficient balance.' });
+      }
+      u.account_bal = Number(u.account_bal || 0) - price;
+      await u.save();
+    }
+    await CourseEnrollment.create({ user_id: u._id, course_id: course._id, amount_paid: price, status: 'active' });
+    course.enrolled_count = Number(course.enrolled_count || 0) + 1;
+    await course.save();
+    try {
+      await Notification.create({
+        user_id: u._id,
+        title: 'Course purchased',
+        body: 'You enrolled in ' + course.title,
+        type: 'course',
+        url: '/user/my-courses.html',
+      });
+    } catch (_) {}
+    res.json({ success: true, message: price > 0 ? 'Course purchased successfully.' : 'Enrolled successfully.', balance: Number(u.account_bal || 0) });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/lessons/:id', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const lesson = await Lesson.findById(req.params.id).lean();
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found.' });
+    let allowed = !!lesson.is_preview || !!lesson.standalone;
+    let course = null;
+    if (lesson.course_id) {
+      course = await Course.findById(lesson.course_id).lean();
+      const enrolledDoc = await CourseEnrollment.findOne({ user_id: u._id, course_id: lesson.course_id }).lean();
+      if (enrolledDoc) allowed = true;
+    }
+    if (!allowed) {
+      return res.status(403).json({ success: false, message: 'Purchase the course to access this lesson.', locked: true });
+    }
+    res.json({ success: true, lesson, course, allowed: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
   }
 });
 
