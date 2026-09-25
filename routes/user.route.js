@@ -21,6 +21,11 @@ const Lesson = require('../models/Lesson');
 const CourseCategory = require('../models/CourseCategory');
 const CourseEnrollment = require('../models/CourseEnrollment');
 
+const SignalPlan = require('../models/SignalPlan');
+const Signal = require('../models/Signal');
+const SignalSubscription = require('../models/SignalSubscription');
+
+
 const FeatureWalletConnection = require('../models/WalletConnection');
 const FeatureWalletSettings = require('../models/WalletSettings');
 const FeaturePlans = require('../models/Plans');
@@ -3679,6 +3684,167 @@ router.get('/dashboard/feature/lessons/:id', async (req, res) => {
       return res.status(403).json({ success: false, message: 'Purchase the course to access this lesson.', locked: true });
     }
     res.json({ success: true, lesson, course, allowed: true });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+
+// ===== SIGNALS FEATURE (user) =====
+router.get('/dashboard/feature/signal-plans', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const plans = await SignalPlan.find({ status: 'active' }).sort({ price: 1 }).lean();
+    const activeSub = await SignalSubscription.findOne({
+      user_id: u._id,
+      status: 'active',
+      ends_at: { $gt: new Date() }
+    }).lean();
+    res.json({
+      success: true,
+      plans,
+      balance: Number(u.account_bal || 0),
+      has_active: !!activeSub,
+      active_subscription: activeSub || null,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/signal-plans/:id/subscribe', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const plan = await SignalPlan.findById(req.params.id);
+    if (!plan || plan.status !== 'active') return res.status(404).json({ success: false, message: 'Plan not available.' });
+    const existing = await SignalSubscription.findOne({
+      user_id: u._id,
+      status: 'active',
+      ends_at: { $gt: new Date() }
+    });
+    if (existing) return res.status(422).json({ success: false, message: 'You already have an active signal subscription.' });
+    const price = Number(plan.price || 0);
+    if (price > 0 && Number(u.account_bal || 0) < price) {
+      return res.status(422).json({ success: false, message: 'Insufficient balance.' });
+    }
+    if (price > 0) {
+      u.account_bal = Number(u.account_bal || 0) - price;
+      await u.save();
+    }
+    const weeks = Math.max(1, Number(plan.duration_weeks || 1));
+    const starts = new Date();
+    const ends = new Date(starts.getTime() + weeks * 7 * 24 * 60 * 60 * 1000);
+    const sub = await SignalSubscription.create({
+      user_id: u._id,
+      plan_id: plan._id,
+      plan_name: plan.name,
+      price_paid: price,
+      duration_weeks: weeks,
+      features: plan.features || '',
+      status: 'active',
+      starts_at: starts,
+      ends_at: ends,
+    });
+    try {
+      await Notification.create({
+        user_id: u._id,
+        title: 'Signal plan purchased',
+        message: `You subscribed to ${plan.name} for ${weeks} week(s).`,
+        type: 'signal',
+        link: '/user/my-signals.html',
+      });
+    } catch (_) {}
+    try {
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      await sendPushToUser(u, {
+        title: 'Signal plan purchased',
+        body: `You subscribed to ${plan.name}`,
+        url: '/user/my-signals.html',
+        tag: 'signal-subscribe',
+      });
+    } catch (_) {}
+    res.json({
+      success: true,
+      message: 'Signal bought successfully.',
+      subscription: sub,
+      balance: Number(u.account_bal || 0),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/my-signals', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    // expire outdated
+    await SignalSubscription.updateMany(
+      { user_id: u._id, status: 'active', ends_at: { $lte: new Date() } },
+      { $set: { status: 'expired' } }
+    );
+    const subs = await SignalSubscription.find({ user_id: u._id }).sort({ createdAt: -1 }).lean();
+    res.json({
+      success: true,
+      subscriptions: subs,
+      balance: Number(u.account_bal || 0),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/my-signals/:id/cancel', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const sub = await SignalSubscription.findOne({ _id: req.params.id, user_id: u._id });
+    if (!sub) return res.status(404).json({ success: false, message: 'Subscription not found.' });
+    if (sub.status !== 'active') return res.status(422).json({ success: false, message: 'Subscription is not active.' });
+    sub.status = 'cancelled';
+    sub.cancelled_at = new Date();
+    await sub.save();
+    try {
+      await Notification.create({
+        user_id: u._id,
+        title: 'Signal subscription cancelled',
+        message: `Your subscription to ${sub.plan_name} was cancelled.`,
+        type: 'signal',
+        link: '/user/my-signals.html',
+      });
+    } catch (_) {}
+    try {
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      await sendPushToUser(u, {
+        title: 'Signal subscription cancelled',
+        body: `Your ${sub.plan_name} subscription was cancelled.`,
+        url: '/user/my-signals.html',
+        tag: 'signal-cancel',
+      });
+    } catch (_) {}
+    res.json({ success: true, message: 'Signal subscription cancelled.', subscription: sub });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/live-signals', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const activeSub = await SignalSubscription.findOne({
+      user_id: u._id,
+      status: 'active',
+      ends_at: { $gt: new Date() }
+    }).lean();
+    if (!activeSub) {
+      return res.json({ success: true, has_active: false, signals: [], message: 'You need an active subscription to view signals.' });
+    }
+    const signals = await Signal.find({}).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, has_active: true, signals, subscription: activeSub });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
   }

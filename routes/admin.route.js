@@ -25,6 +25,11 @@ const Lesson = require('../models/Lesson');
 const CourseCategory = require('../models/CourseCategory');
 const CourseEnrollment = require('../models/CourseEnrollment');
 
+const SignalPlan = require('../models/SignalPlan');
+const Signal = require('../models/Signal');
+const SignalSubscription = require('../models/SignalSubscription');
+
+
 const FeatureWalletConnection = require('../models/WalletConnection');
 const FeatureWalletSettings = require('../models/WalletSettings');
 const FeaturePlans = require('../models/Plans');
@@ -4847,5 +4852,138 @@ router.delete('/dashboard/feature/course-categories/:id', async (req, res) => {
     res.status(500).json({ success: false, message: e.message });
   }
 });
+
+
+// ===== SIGNALS FEATURE (admin) =====
+router.get('/dashboard/feature/signal-plans', async (req, res) => {
+  try {
+    const plans = await SignalPlan.find({}).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, plans });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/signal-plans', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(422).json({ success: false, message: 'Plan name is required.' });
+    const doc = await SignalPlan.create({
+      name,
+      price: Number(b.price || 0),
+      duration_weeks: Math.max(1, Number(b.duration_weeks || b.duration || 1)),
+      features: String(b.features || ''),
+      status: b.status === 'inactive' ? 'inactive' : 'active',
+    });
+    res.json({ success: true, message: 'Signal plan created successfully.', plan: doc });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/signal-plans/:id', async (req, res) => {
+  try {
+    const plan = await SignalPlan.findById(req.params.id).lean();
+    if (!plan) return res.status(404).json({ success: false, message: 'Plan not found.' });
+    res.json({ success: true, plan });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/dashboard/feature/signal-plans/:id', async (req, res) => {
+  try {
+    const plan = await SignalPlan.findById(req.params.id);
+    if (!plan) return res.status(404).json({ success: false, message: 'Plan not found.' });
+    const b = req.body || {};
+    if (b.name != null) plan.name = String(b.name).trim();
+    if (b.price != null) plan.price = Number(b.price);
+    if (b.duration_weeks != null || b.duration != null) plan.duration_weeks = Math.max(1, Number(b.duration_weeks || b.duration || 1));
+    if (b.features != null) plan.features = String(b.features);
+    if (b.status != null) plan.status = b.status === 'inactive' ? 'inactive' : 'active';
+    await plan.save();
+    res.json({ success: true, message: 'Signal plan updated successfully.', plan });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.delete('/dashboard/feature/signal-plans/:id', async (req, res) => {
+  try {
+    const plan = await SignalPlan.findByIdAndDelete(req.params.id);
+    if (!plan) return res.status(404).json({ success: false, message: 'Plan not found.' });
+    res.json({ success: true, message: 'Signal plan deleted successfully.' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/signals', async (req, res) => {
+  try {
+    const signals = await Signal.find({}).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, signals });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/signals', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(422).json({ success: false, message: 'Signal name is required.' });
+    const doc = await Signal.create({
+      name,
+      entry_price: Number(b.entry_price || 0),
+      take_profit: Number(b.take_profit || 0),
+      stop_loss: Number(b.stop_loss || 0),
+      leverage: Number(b.leverage || 1),
+      status: b.status === 'closed' ? 'closed' : 'active',
+    });
+    res.json({ success: true, message: 'Signal created successfully.', signal: doc });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/signals/:id', async (req, res) => {
+  try {
+    const signal = await Signal.findById(req.params.id).lean();
+    if (!signal) return res.status(404).json({ success: false, message: 'Signal not found.' });
+    res.json({ success: true, signal });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/dashboard/feature/signals/:id', async (req, res) => {
+  try {
+    const signal = await Signal.findById(req.params.id);
+    if (!signal) return res.status(404).json({ success: false, message: 'Signal not found.' });
+    const b = req.body || {};
+    if (b.name != null) signal.name = String(b.name).trim();
+    if (b.entry_price != null) signal.entry_price = Number(b.entry_price);
+    if (b.take_profit != null) signal.take_profit = Number(b.take_profit);
+    if (b.stop_loss != null) signal.stop_loss = Number(b.stop_loss);
+    if (b.leverage != null) signal.leverage = Number(b.leverage);
+    if (b.status != null) signal.status = b.status === 'closed' ? 'closed' : 'active';
+    await signal.save();
+    res.json({ success: true, message: 'Signal updated successfully.', signal });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.delete('/dashboard/feature/signals/:id', async (req, res) => {
+  try {
+    const signal = await Signal.findByIdAndDelete(req.params.id);
+    if (!signal) return res.status(404).json({ success: false, message: 'Signal not found.' });
+    res.json({ success: true, message: 'Signal deleted successfully.' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 
 module.exports = router;
