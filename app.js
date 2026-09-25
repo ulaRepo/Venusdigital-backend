@@ -73,6 +73,7 @@ app.use((req, res, next) => {
 });
 app.use(checkUser);
 
+
 app.use('/', require('./routes/index.route'));
 app.use('/auth', require('./routes/auth.route'));
 app.use('/user', requireAuth, require('./routes/user.route'));
@@ -100,3 +101,4 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.log(err.message));
 
 module.exports = app;
+

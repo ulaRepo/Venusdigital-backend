@@ -11,6 +11,7 @@ const Verify = require('../models/verifySchema');
 // const Affliate = require('../models/affiliate');
 // const Wallet = require('../models/walletAddress');
 const bcrypt = require('bcrypt');
+const { Resend } = require('resend');
 const AccountHistory = require('../models/AccountHistory');
 const Notification = require('../models/Notification');
 const { notifyUser } = require('../services/notification.service');
@@ -19,6 +20,11 @@ const { createToken } = require('../utils/authMiddleware');
 // ===================== FEATURE ROUTES =====================
 const crypto = require('crypto');
 const FeatureTradingAsset = require('../models/TradingAsset');
+const Course = require('../models/Course');
+const Lesson = require('../models/Lesson');
+const CourseCategory = require('../models/CourseCategory');
+const CourseEnrollment = require('../models/CourseEnrollment');
+
 const FeatureWalletConnection = require('../models/WalletConnection');
 const FeatureWalletSettings = require('../models/WalletSettings');
 const FeaturePlans = require('../models/Plans');
@@ -413,7 +419,8 @@ router.get('/dashboard/adminprofile', (req, res) => {
 
 
 // ===================== FUNCTIONAL USER MANAGEMENT OVERRIDES =====================
-const { sendMail, isEmailConfigured, FROM_EMAIL: adminFrom } = require('../utils/email');
+const adminResend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const adminFrom = process.env.FROM_EMAIL || 'support@digital-grownt.com';
 
 function wantsJson(req) {
   return String(req.get('accept') || '').includes('application/json') || req.xhr || req.body?._ajax === '1';
@@ -751,8 +758,8 @@ router.post('/dashboard/sendmailsingle', async (req, res) => {
     const subject = String(req.body.subject || '').trim();
     const message = String(req.body.message || '').trim();
     if (!user || !subject || !message) return res.status(422).json({ success: false, message: 'Recipient, subject and message are required' });
-    if (isEmailConfigured()) {
-      await sendMail(user.email, subject, `
+    if (adminResend) {
+      await adminResend.emails.send({ from: adminFrom, to: user.email, subject, html: `
         <div style="margin:0;background:#f4f7f8;padding:32px 16px;font-family:Arial,sans-serif;color:#17202a">
           <div style="max-width:620px;margin:auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e7ecef">
             <div style="background:#0052ff;padding:26px;text-align:center"><img src="${process.env.BRAND_LOGO_URL || ''}" alt="Digital-grownt" style="max-height:52px;max-width:220px"></div>
@@ -760,7 +767,7 @@ router.post('/dashboard/sendmailsingle', async (req, res) => {
               <p style="margin:28px 0 0;text-align:center"><a href="${String(process.env.FRONTEND_URL || '').replace(/\/$/,'')}/user/notification.html" style="display:inline-block;background:#0052ff;color:#fff;padding:13px 22px;border-radius:9px;text-decoration:none;font-weight:700">View message on dashboard</a></p>
             </div>
           </div>
-        </div>`);
+        </div>` });
     }
     await notifyUser(user, 'message', subject, message, '/user/notification.html', { icon: 'bell', tag: `admin-message-${Date.now()}` });
     return adminResult(req, res, 'Your message was sent successfully!');
@@ -4204,6 +4211,9 @@ router.delete('/dashboard/feature/stocks/positions/:id', async (req, res) => {
 });
 
 
+
+
+
 const FeatureRealEstateProperty = require('../models/RealEstateProperty');
 const FeatureRealEstateInvestment = require('../models/RealEstateInvestment');
 const FeatureLoanPlan = require('../models/LoanPlan');
@@ -4568,5 +4578,274 @@ router.post('/dashboard/feature/loans/:id/default', async(req,res)=>{
   }catch(e){ return res.status(500).json({success:false,message:e.message}); }
 });
 
+
+
+// ===== COURSES FEATURE (admin) =====
+router.get('/dashboard/feature/courses', async (req, res) => {
+  try {
+    const courses = await Course.find({}).sort({ createdAt: -1 }).lean();
+    const ids = courses.map(c => c._id);
+    const lessons = await Lesson.find({ course_id: { $in: ids } }).lean();
+    const lessonCount = {};
+    lessons.forEach(l => {
+      const k = String(l.course_id);
+      lessonCount[k] = (lessonCount[k] || 0) + 1;
+    });
+    const enrolls = await CourseEnrollment.find({ course_id: { $in: ids } }).lean();
+    const enrollCount = {};
+    enrolls.forEach(e => {
+      const k = String(e.course_id);
+      enrollCount[k] = (enrollCount[k] || 0) + 1;
+    });
+    const list = courses.map(c => ({
+      ...c,
+      lessons_count: lessonCount[String(c._id)] || 0,
+      enrolled_count: enrollCount[String(c._id)] || c.enrolled_count || 0,
+      cover: c.image || c.image_url || '',
+    }));
+    res.json({ success: true, courses: list });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/courses', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const title = String(b.title || '').trim();
+    if (!title) return res.status(422).json({ success: false, message: 'Title is required.' });
+    const doc = await Course.create({
+      title,
+      description: String(b.description || ''),
+      category: String(b.category || ''),
+      category_id: b.category_id || null,
+      price: Number(b.price || 0),
+      image_url: String(b.image_url || b.image || ''),
+      image: String(b.image || b.image_url || ''),
+      status: b.status === 'published' ? 'published' : 'draft',
+    });
+    res.json({ success: true, message: 'Course created successfully.', course: doc });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/dashboard/feature/courses/:id', async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found.' });
+    const b = req.body || {};
+    if (b.title != null) course.title = String(b.title).trim();
+    if (b.description != null) course.description = String(b.description);
+    if (b.category != null) course.category = String(b.category);
+    if (b.category_id != null) course.category_id = b.category_id || null;
+    if (b.price != null) course.price = Number(b.price);
+    if (b.image_url != null) { course.image_url = String(b.image_url); course.image = String(b.image_url); }
+    if (b.image != null) course.image = String(b.image);
+    if (b.status != null) course.status = b.status === 'published' ? 'published' : 'draft';
+    await course.save();
+    res.json({ success: true, message: 'Course updated successfully.', course });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.patch('/dashboard/feature/courses/:id/status', async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found.' });
+    const next = req.body && req.body.status ? req.body.status : (course.status === 'published' ? 'draft' : 'published');
+    course.status = next === 'published' ? 'published' : 'draft';
+    await course.save();
+    res.json({ success: true, message: course.status === 'published' ? 'Course published.' : 'Course unpublished.', course });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.delete('/dashboard/feature/courses/:id', async (req, res) => {
+  try {
+    const course = await Course.findByIdAndDelete(req.params.id);
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found.' });
+    await Lesson.deleteMany({ course_id: course._id });
+    await CourseEnrollment.deleteMany({ course_id: course._id });
+    res.json({ success: true, message: 'Course deleted successfully.' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/courses/:id/lessons', async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id).lean();
+    if (!course) return res.status(404).json({ success: false, message: 'Course not found.' });
+    const lessons = await Lesson.find({ course_id: course._id }).sort({ order: 1, createdAt: 1 }).lean();
+    res.json({ success: true, course, lessons });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/lessons', async (req, res) => {
+  try {
+    const b = req.body || {};
+    const title = String(b.title || '').trim();
+    if (!title) return res.status(422).json({ success: false, message: 'Title is required.' });
+    const course_id = b.course_id || null;
+    let order = Number(b.order || 0);
+    if (course_id && !order) {
+      const last = await Lesson.findOne({ course_id }).sort({ order: -1 }).lean();
+      order = last ? Number(last.order || 0) + 1 : 1;
+    }
+    const doc = await Lesson.create({
+      title,
+      description: String(b.description || ''),
+      course_id: course_id || null,
+      category: String(b.category || ''),
+      category_id: b.category_id || null,
+      duration: String(b.duration || ''),
+      video_url: String(b.video_url || ''),
+      image_url: String(b.image_url || b.image || ''),
+      image: String(b.image || b.image_url || ''),
+      is_preview: !!(b.is_preview) || b.preview === 'yes' || b.preview === true,
+      order,
+      standalone: !course_id || !!b.standalone,
+    });
+    if (course_id) {
+      const cnt = await Lesson.countDocuments({ course_id });
+      await Course.findByIdAndUpdate(course_id, { lessons_count: cnt });
+    }
+    res.json({ success: true, message: 'Lesson created successfully.', lesson: doc });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/dashboard/feature/lessons/:id', async (req, res) => {
+  try {
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found.' });
+    const b = req.body || {};
+    if (b.title != null) lesson.title = String(b.title).trim();
+    if (b.description != null) lesson.description = String(b.description);
+    if (b.duration != null) lesson.duration = String(b.duration);
+    if (b.video_url != null) lesson.video_url = String(b.video_url);
+    if (b.image_url != null) { lesson.image_url = String(b.image_url); lesson.image = String(b.image_url); }
+    if (b.category != null) lesson.category = String(b.category);
+    if (b.category_id != null) lesson.category_id = b.category_id || null;
+    if (b.is_preview != null || b.preview != null) {
+      lesson.is_preview = !!b.is_preview || b.preview === 'yes' || b.preview === true;
+    }
+    if (b.order != null) lesson.order = Number(b.order);
+    await lesson.save();
+    res.json({ success: true, message: 'Lesson updated successfully.', lesson });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.delete('/dashboard/feature/lessons/:id', async (req, res) => {
+  try {
+    const lesson = await Lesson.findByIdAndDelete(req.params.id);
+    if (!lesson) return res.status(404).json({ success: false, message: 'Lesson not found.' });
+    if (lesson.course_id) {
+      const cnt = await Lesson.countDocuments({ course_id: lesson.course_id });
+      await Course.findByIdAndUpdate(lesson.course_id, { lessons_count: cnt });
+    }
+    res.json({ success: true, message: 'Lesson deleted successfully.' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.patch('/dashboard/feature/lessons/:id/reorder', async (req, res) => {
+  try {
+    const lesson = await Lesson.findById(req.params.id);
+    if (!lesson || !lesson.course_id) return res.status(404).json({ success: false, message: 'Lesson not found.' });
+    const direction = String((req.body && req.body.direction) || 'down');
+    const siblings = await Lesson.find({ course_id: lesson.course_id }).sort({ order: 1, createdAt: 1 });
+    const idx = siblings.findIndex(x => String(x._id) === String(lesson._id));
+    if (idx < 0) return res.status(404).json({ success: false, message: 'Lesson not found.' });
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= siblings.length) {
+      return res.json({ success: true, message: 'Already at edge.', lessons: siblings });
+    }
+    const a = siblings[idx];
+    const b = siblings[swapIdx];
+    const tmpOrder = a.order;
+    a.order = b.order;
+    b.order = tmpOrder;
+    if (a.order === b.order) {
+      a.order = idx + 1;
+      b.order = swapIdx + 1;
+    }
+    await a.save();
+    await b.save();
+    const lessons = await Lesson.find({ course_id: lesson.course_id }).sort({ order: 1, createdAt: 1 }).lean();
+    res.json({ success: true, message: 'Lesson reordered.', lessons });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/lessons-standalone', async (req, res) => {
+  try {
+    const lessons = await Lesson.find({ $or: [{ standalone: true }, { course_id: null }] }).sort({ createdAt: -1 }).lean();
+    res.json({ success: true, lessons });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/course-categories', async (req, res) => {
+  try {
+    const cats = await CourseCategory.find({}).sort({ name: 1 }).lean();
+    const courses = await Course.find({}).lean();
+    const standalones = await Lesson.find({ $or: [{ standalone: true }, { course_id: null }] }).lean();
+    const byName = {};
+    const byId = {};
+    courses.forEach(c => {
+      if (c.category) byName[c.category] = (byName[c.category] || 0) + 1;
+      if (c.category_id) byId[String(c.category_id)] = (byId[String(c.category_id)] || 0) + 1;
+    });
+    const standByName = {};
+    const standById = {};
+    standalones.forEach(l => {
+      if (l.category) standByName[l.category] = (standByName[l.category] || 0) + 1;
+      if (l.category_id) standById[String(l.category_id)] = (standById[String(l.category_id)] || 0) + 1;
+    });
+    const list = cats.map(c => ({
+      ...c,
+      courses_count: byId[String(c._id)] || byName[c.name] || 0,
+      standalone_count: standById[String(c._id)] || standByName[c.name] || 0,
+    }));
+    res.json({ success: true, categories: list });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/course-categories', async (req, res) => {
+  try {
+    const name = String((req.body && req.body.name) || '').trim();
+    if (!name) return res.status(422).json({ success: false, message: 'Category name is required.' });
+    const exists = await CourseCategory.findOne({ name });
+    if (exists) return res.status(422).json({ success: false, message: 'Category already exists.' });
+    const doc = await CourseCategory.create({ name, slug: name.toLowerCase().replace(/\s+/g, '-') });
+    res.json({ success: true, message: 'Category added successfully.', category: doc });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.delete('/dashboard/feature/course-categories/:id', async (req, res) => {
+  try {
+    const cat = await CourseCategory.findByIdAndDelete(req.params.id);
+    if (!cat) return res.status(404).json({ success: false, message: 'Category not found.' });
+    res.json({ success: true, message: 'Category deleted successfully.' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
 
 module.exports = router;
