@@ -25,6 +25,13 @@ const SignalPlan = require('../models/SignalPlan');
 const Signal = require('../models/Signal');
 const SignalSubscription = require('../models/SignalSubscription');
 
+const Nft = require('../models/Nft');
+const NftCategory = require('../models/NftCategory');
+const NftCollection = require('../models/NftCollection');
+const NftBid = require('../models/NftBid');
+const NftTransaction = require('../models/NftTransaction');
+
+
 
 const FeatureWalletConnection = require('../models/WalletConnection');
 const FeatureWalletSettings = require('../models/WalletSettings');
@@ -3847,6 +3854,755 @@ router.get('/dashboard/feature/live-signals', async (req, res) => {
     res.json({ success: true, has_active: true, signals, subscription: activeSub });
   } catch (e) {
     res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+
+// ===== NFT FEATURE (user) =====
+async function getEthUsdPrice() {
+  // 1) Live price from TradingAsset (ETH listed in admin assets)
+  try {
+    const asset = await FeatureTradingAsset.findOne({
+      $or: [
+        { symbol: /^ETH$/i },
+        { symbol: /^WETH$/i },
+        { name: /^ethereum$/i },
+        { name: /ethereum/i },
+        { coingecko_id: 'ethereum' },
+      ],
+      is_active: { $ne: false },
+    }).lean();
+    if (asset) {
+      const p = Number(
+        asset.price ||
+        asset.last_price ||
+        asset.current_price ||
+        asset.usd_price ||
+        0
+      );
+      if (Number.isFinite(p) && p > 0) return p;
+    }
+  } catch (_) {}
+  // 2) Fallback CoinGecko
+  try {
+    const r = await fetch(
+      'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd'
+    );
+    const j = await r.json();
+    if (j && j.ethereum && Number(j.ethereum.usd) > 0) return Number(j.ethereum.usd);
+  } catch (_) {}
+  return 0;
+}
+
+/** Effective spendable balance (keeps balance + account_bal in sync). */
+function nftUserBalance(user) {
+  if (!user) return 0;
+  const a = Number(user.account_bal);
+  const b = Number(user.balance);
+  const av = Number.isFinite(a) ? a : 0;
+  const bv = Number.isFinite(b) ? b : 0;
+  // Prefer the higher of the two so a desynced field never under-reports funds;
+  // after any NFT money move we always write both to the same value.
+  return Math.max(av, bv);
+}
+
+/**
+ * Atomically apply a signed USD delta to BOTH balance and account_bal.
+ * delta < 0 = debit, delta > 0 = credit.
+ * Returns updated user doc or null if debit would go below zero.
+ */
+async function nftAdjustBalance(userId, delta) {
+  const id = userId;
+  if (!id) return null;
+  const d = Number(delta);
+  if (!Number.isFinite(d) || d === 0) {
+    return User.findById(id);
+  }
+  // Load fresh, compute, save (runs pre-save sync hook)
+  const user = await User.findById(id);
+  if (!user) return null;
+  const current = nftUserBalance(user);
+  const next = Math.round((current + d) * 100) / 100;
+  if (next < -0.0001) return null; // insufficient
+  const safe = Math.max(0, next);
+  user.account_bal = safe;
+  user.balance = safe;
+  await user.save();
+  return user;
+}
+
+
+
+function nftUserName(u) {
+  return u.fullname || [u.firstname, u.lastname].filter(Boolean).join(' ') || u.username || u.email || 'User';
+}
+
+router.get('/dashboard/feature/nfts', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const q = req.query || {};
+    const filter = { approved: true };
+    if (q.category) filter.category = q.category;
+    if (q.collection) filter.collection_name = q.collection;
+    if (q.status) filter.status = q.status;
+    if (q.search) {
+      const s = String(q.search).trim();
+      filter.$or = [
+        { name: new RegExp(s, 'i') },
+        { description: new RegExp(s, 'i') },
+        { token_id: new RegExp(s, 'i') },
+      ];
+    }
+    const nfts = await Nft.find(filter).sort({ createdAt: -1 }).lean();
+    const featured = await Nft.find({ approved: true, featured: true }).sort({ createdAt: -1 }).limit(8).lean();
+    const categories = await NftCategory.find({ status: 'active' }).sort({ name: 1 }).lean();
+    const collections = await NftCollection.find({ status: 'active' }).sort({ name: 1 }).lean();
+    const counts = {};
+    for (const c of collections) {
+      counts[String(c._id)] = await Nft.countDocuments({ collection_id: c._id, approved: true });
+      counts[c.name] = counts[String(c._id)];
+    }
+    const list = collections.map((c) => ({ ...c, items_count: counts[String(c._id)] || 0 }));
+    res.json({
+      success: true,
+      nfts,
+      featured: featured.length ? featured : nfts.slice(0, 6),
+      categories,
+      collections: list,
+      balance: Number(u.account_bal || 0),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/nfts/meta', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const categories = await NftCategory.find({ status: 'active' }).sort({ name: 1 }).lean();
+    const collections = await NftCollection.find({ status: 'active' }).sort({ name: 1 }).lean();
+    const ethUsd = await getEthUsdPrice();
+    res.json({ success: true, categories, collections, eth_usd: ethUsd, balance: Number(u.account_bal || 0) });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/nfts', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const b = req.body || {};
+    const name = String(b.name || '').trim();
+    if (!name) return res.status(422).json({ success: false, message: 'NFT name is required.' });
+    const priceEth = Math.max(0.05, Number(b.price_eth || b.price || 0.05));
+    const ethUsd = await getEthUsdPrice();
+    if (!ethUsd || ethUsd <= 0) {
+      return res.status(503).json({ success: false, message: 'ETH price unavailable. Try again later.' });
+    }
+    const costUsd = priceEth * ethUsd;
+    if (Number(u.account_bal || 0) < costUsd) {
+      return res.status(422).json({
+        success: false,
+        message: `Insufficient balance. Need $${costUsd.toFixed(2)} (${priceEth} ETH @ $${ethUsd.toFixed(2)}) but have $${Number(u.account_bal || 0).toFixed(2)}.`,
+      });
+    }
+    const _mintBal = nftUserBalance(u);
+    if (_mintBal < costUsd) {
+      return res.status(422).json({ success: false, message: `Insufficient balance. Need $${costUsd.toFixed(2)}.` });
+    }
+    u.account_bal = Math.round((_mintBal - costUsd) * 100) / 100;
+    u.balance = u.account_bal;
+    await u.save();
+    let props = {};
+    try {
+      if (b.properties) props = typeof b.properties === 'string' ? JSON.parse(b.properties) : b.properties;
+    } catch (_) {
+      props = {};
+    }
+    const tokenId = 'TXP-' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase();
+    const uname = nftUserName(u);
+    const doc = await Nft.create({
+      name,
+      description: String(b.description || ''),
+      image_url: String(b.image_url || b.image || ''),
+      price_eth: priceEth,
+      category: String(b.category || ''),
+      category_id: b.category_id || null,
+      collection_name: String(b.collection_name || b.collection || ''),
+      collection_id: b.collection_id || null,
+      properties: props,
+      creator_id: u._id,
+      owner_id: u._id,
+      creator_name: uname,
+      owner_name: uname,
+      status: 'available',
+      featured: false,
+      approved: true,
+      token_id: tokenId,
+      royalty: Number(b.royalty || 2.5),
+    });
+    await NftTransaction.create({
+      nft_id: doc._id,
+      nft_name: doc.name,
+      from_id: null,
+      to_id: u._id,
+      from_name: 'Minted',
+      to_name: uname,
+      type: 'mint',
+      amount_eth: priceEth,
+      amount_usd: costUsd,
+    });
+    try {
+      await Notification.create({
+        user_id: u._id,
+        title: 'NFT listed successfully',
+        message: `${name} was minted for ${priceEth} ETH ($${costUsd.toFixed(2)}).`,
+        type: 'nft',
+        link: '/user/my-nfts.html',
+      });
+    } catch (_) {}
+    res.json({
+      success: true,
+      message: 'NFT listed successfully.',
+      nft: doc,
+      balance: Number(u.account_bal || 0),
+      eth_usd: ethUsd,
+      cost_usd: costUsd,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/nfts/mine', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const owned = await Nft.find({ owner_id: u._id }).sort({ createdAt: -1 }).lean();
+    const created = await Nft.find({ creator_id: u._id }).sort({ createdAt: -1 }).lean();
+    const favorites = await Nft.find({ creator_id: u._id, liked_by: u._id }).sort({ createdAt: -1 }).lean();
+    const totalValue = owned.reduce((s, n) => s + Number(n.price_eth || 0), 0);
+    res.json({
+      success: true,
+      owned,
+      created,
+      favorites,
+      stats: {
+        owned: owned.length,
+        created: created.length,
+        favorites: favorites.length,
+        total_value_eth: totalValue,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/nfts/collection/:id', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    let col = null;
+    const id = req.params.id;
+    if (String(id).match(/^[0-9a-fA-F]{24}$/)) col = await NftCollection.findById(id).lean();
+    if (!col) col = await NftCollection.findOne({ name: id }).lean();
+    if (!col) return res.status(404).json({ success: false, message: 'Collection not found.' });
+    const nfts = await Nft.find({
+      $or: [{ collection_id: col._id }, { collection_name: col.name }],
+      approved: true,
+    }).sort({ createdAt: -1 }).lean();
+    const floor = nfts.length ? Math.min(...nfts.map((n) => Number(n.price_eth || 0))) : 0;
+    const volume = nfts.reduce((s, n) => s + Number(n.price_eth || 0), 0);
+    res.json({
+      success: true,
+      collection: { ...col, items_count: nfts.length, floor_price: floor, volume, royalty: col.royalty || 2.5 },
+      nfts,
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/nfts/:id', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const nft = await Nft.findById(req.params.id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    nft.views = Number(nft.views || 0) + 1;
+    await nft.save();
+    const bids = await NftBid.find({ nft_id: nft._id }).sort({ createdAt: -1 }).lean();
+    const history = await NftTransaction.find({ nft_id: nft._id }).sort({ createdAt: -1 }).lean();
+    const liked = (nft.liked_by || []).some((id) => String(id) === String(u._id));
+    const isOwner = String(nft.owner_id) === String(u._id);
+    res.json({
+      success: true,
+      nft: nft.toObject(),
+      bids,
+      history,
+      liked,
+      is_owner: isOwner,
+      balance: Number(u.account_bal || 0),
+    });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/nfts/:id/like', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const nft = await Nft.findById(req.params.id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    const idx = (nft.liked_by || []).findIndex((id) => String(id) === String(u._id));
+    if (idx >= 0) {
+      nft.liked_by.splice(idx, 1);
+      nft.likes = Math.max(0, Number(nft.likes || 0) - 1);
+    } else {
+      nft.liked_by.push(u._id);
+      nft.likes = Number(nft.likes || 0) + 1;
+    }
+    await nft.save();
+    res.json({ success: true, likes: nft.likes, liked: idx < 0 });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/nfts/:id/bid', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const nft = await Nft.findById(req.params.id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    if (String(nft.owner_id) === String(u._id)) {
+      return res.status(422).json({ success: false, message: 'You already own this NFT.' });
+    }
+    const amount = Number((req.body && req.body.amount_eth) || (req.body && req.body.amount) || 0);
+    if (amount <= 0) return res.status(422).json({ success: false, message: 'Bid amount must be greater than 0.' });
+    const bid = await NftBid.create({
+      nft_id: nft._id,
+      user_id: u._id,
+      user_name: nftUserName(u),
+      amount_eth: amount,
+      status: 'pending',
+    });
+    try {
+      await Notification.create({
+        user_id: nft.owner_id,
+        title: 'New NFT bid',
+        message: `${nftUserName(u)} bid ${amount} ETH on ${nft.name}.`,
+        type: 'nft',
+        link: '/user/nfts-details.html?id=' + nft._id,
+      });
+    } catch (_) {}
+    res.json({ success: true, message: 'Bid placed successfully.', bid });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+router.post('/dashboard/feature/nfts/:id/bids/:bidId/accept', async (req, res) => {
+  try {
+    const ownerId = featureIdOf(req);
+    if (!ownerId) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const owner = await User.findById(ownerId);
+    if (!owner) return res.status(401).json({ success: false, message: 'Authentication required.' });
+
+    const nft = await Nft.findById(req.params.id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    if (String(nft.owner_id) !== String(owner._id)) {
+      return res.status(403).json({ success: false, message: 'Only the current NFT owner can accept bids.' });
+    }
+
+    const bid = await NftBid.findOne({ _id: req.params.bidId, nft_id: nft._id });
+    if (!bid) return res.status(404).json({ success: false, message: 'Bid not found.' });
+    if (bid.status !== 'pending') return res.status(422).json({ success: false, message: 'Bid is not pending.' });
+    if (String(bid.user_id) === String(owner._id)) {
+      return res.status(422).json({ success: false, message: 'Cannot accept your own bid.' });
+    }
+
+    const amountEth = Number(bid.amount_eth || 0);
+    if (!(amountEth > 0)) return res.status(422).json({ success: false, message: 'Invalid bid amount.' });
+
+    const ethUsd = await getEthUsdPrice();
+    if (!(ethUsd > 0)) {
+      return res.status(503).json({ success: false, message: 'ETH price unavailable.' });
+    }
+    const costUsd = Number((amountEth * ethUsd).toFixed(2));
+
+    const debit = await User.findOneAndUpdate(
+      { _id: bid.user_id, account_bal: { $gte: costUsd } },
+      { $inc: { account_bal: -costUsd } },
+      { new: true }
+    );
+    if (!debit) {
+      const bidder = await User.findById(bid.user_id).select('account_bal').lean();
+      const bal = Number(bidder && bidder.account_bal) || 0;
+      return res.status(422).json({
+        success: false,
+        message: `Bidder has insufficient balance. Need $${costUsd.toFixed(2)} (${amountEth} ETH @ $${ethUsd.toFixed(2)}). Bidder balance: $${bal.toFixed(2)}.`,
+      });
+    }
+
+    const credit = await User.findByIdAndUpdate(owner._id, { $inc: { account_bal: costUsd } }, { new: true });
+
+    const prevOwnerId = nft.owner_id;
+    const prevOwnerName = nft.owner_name;
+    const bidderName = nftUserName(debit);
+
+    nft.owner_id = debit._id;
+    nft.owner_name = bidderName;
+    nft.price_eth = amountEth;
+    nft.status = 'sold';
+    await nft.save();
+
+    bid.status = 'accepted';
+    await bid.save();
+    await NftBid.updateMany(
+      { nft_id: nft._id, status: 'pending', _id: { $ne: bid._id } },
+      { $set: { status: 'rejected' } }
+    );
+
+    await NftTransaction.create({
+      nft_id: nft._id,
+      nft_name: nft.name,
+      from_id: prevOwnerId,
+      to_id: debit._id,
+      from_name: prevOwnerName,
+      to_name: bidderName,
+      type: 'bid_accept',
+      amount_eth: amountEth,
+      amount_usd: costUsd,
+    });
+
+    try {
+      await Notification.create({
+        user_id: debit._id,
+        title: 'Bid accepted',
+        message: `The owner accepted your bid of ${amountEth} ETH (≈ $${costUsd.toFixed(2)}) on ${nft.name}.`,
+        type: 'nft',
+        link: '/user/nfts-details.html?id=' + nft._id,
+      });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `Bid accepted. ${amountEth} ETH (≈ $${costUsd.toFixed(2)}) transferred.`,
+      bid,
+      nft,
+      balance: Number(credit && credit.account_bal) || 0,
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/nfts/:id/bids/:bidId/reject', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const nft = await Nft.findById(req.params.id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    if (String(nft.owner_id) !== String(u._id)) {
+      return res.status(403).json({ success: false, message: 'Only the NFT owner can reject bids.' });
+    }
+    const bid = await NftBid.findOne({ _id: req.params.bidId, nft_id: nft._id });
+    if (!bid) return res.status(404).json({ success: false, message: 'Bid not found.' });
+    if (bid.status !== 'pending') {
+      return res.status(422).json({ success: false, message: 'Bid is not pending.' });
+    }
+    bid.status = 'rejected';
+    await bid.save();
+    try {
+      await Notification.create({
+        user_id: bid.user_id,
+        title: 'Bid rejected',
+        message: `Your bid of ${Number(bid.amount_eth || 0)} ETH on ${nft.name} was rejected.`,
+        type: 'nft',
+        link: '/user/nfts-details.html?id=' + nft._id,
+      });
+    } catch (_) {}
+    res.json({ success: true, message: 'Bid rejected.', bid });
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+router.post('/dashboard/feature/nfts/:id/buy', async (req, res) => {
+  try {
+    const buyerId = featureIdOf(req);
+    if (!buyerId) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const buyer = await User.findById(buyerId);
+    if (!buyer) return res.status(401).json({ success: false, message: 'Authentication required.' });
+
+    const nft = await Nft.findById(req.params.id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    if (String(nft.owner_id) === String(buyer._id)) {
+      return res.status(422).json({ success: false, message: 'You already own this NFT.' });
+    }
+
+    const priceEth = Number(nft.price_eth || 0);
+    if (!(priceEth > 0)) {
+      return res.status(422).json({ success: false, message: 'Invalid NFT price.' });
+    }
+
+    const ethUsd = await getEthUsdPrice();
+    if (!(ethUsd > 0)) {
+      return res.status(503).json({
+        success: false,
+        message: 'ETH price unavailable. Ensure Ethereum (ETH) is listed as an asset with a live price, then try again.',
+      });
+    }
+
+    const costUsd = Number((priceEth * ethUsd).toFixed(2));
+    const bal = nftUserBalance(buyer);
+    if (bal < costUsd) {
+      return res.status(422).json({
+        success: false,
+        message: `Insufficient balance. This NFT costs ${priceEth} ETH ≈ $${costUsd.toFixed(2)} (ETH @ $${ethUsd.toFixed(2)}). Your balance is $${bal.toFixed(2)}.`,
+        required_usd: costUsd,
+        eth_usd: ethUsd,
+        price_eth: priceEth,
+        balance: bal,
+      });
+    }
+
+    const buyerAfter = await nftAdjustBalance(buyer._id, -costUsd);
+    if (!buyerAfter) {
+      return res.status(422).json({
+        success: false,
+        message: `Insufficient balance. Need $${costUsd.toFixed(2)} (${priceEth} ETH @ $${ethUsd.toFixed(2)}).`,
+      });
+    }
+
+    const sellerId = nft.owner_id;
+    const prevOwnerName = nft.owner_name || '';
+    let sellerAfter = null;
+    if (sellerId && String(sellerId) !== String(buyer._id)) {
+      sellerAfter = await nftAdjustBalance(sellerId, costUsd);
+      if (!sellerAfter) {
+        await nftAdjustBalance(buyer._id, costUsd); // rollback
+        return res.status(500).json({ success: false, message: 'Failed to credit seller. Purchase rolled back.' });
+      }
+    }
+
+    nft.owner_id = buyer._id;
+    nft.owner_name = nftUserName(buyer);
+    nft.status = 'sold';
+    await nft.save();
+
+    await NftTransaction.create({
+      nft_id: nft._id,
+      nft_name: nft.name,
+      from_id: sellerId || null,
+      to_id: buyer._id,
+      from_name: prevOwnerName,
+      to_name: nftUserName(buyer),
+      type: 'sale',
+      amount_eth: priceEth,
+      amount_usd: costUsd,
+    });
+
+    try {
+      await Notification.create({
+        user_id: buyer._id,
+        title: 'NFT purchased',
+        message: `You bought ${nft.name} for ${priceEth} ETH (≈ $${costUsd.toFixed(2)}).`,
+        type: 'nft',
+        link: '/user/my-nfts.html',
+      });
+      if (sellerId) {
+        await Notification.create({
+          user_id: sellerId,
+          title: 'NFT sold',
+          message: `${nftUserName(buyer)} bought your NFT ${nft.name} for ${priceEth} ETH (≈ $${costUsd.toFixed(2)}). $${costUsd.toFixed(2)} was credited to your balance.`,
+          type: 'nft',
+          link: '/user/nfts-details.html?id=' + nft._id,
+        });
+      }
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `NFT purchased successfully for ${priceEth} ETH (≈ $${costUsd.toFixed(2)}).`,
+      nft,
+      balance: nftUserBalance(buyerAfter),
+      cost_usd: costUsd,
+      eth_usd: ethUsd,
+    });
+  } catch (e) {
+    console.error('[nft buy]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/nfts/bids/:bidId/accept', async (req, res) => {
+  try {
+    const ownerId = featureIdOf(req);
+    if (!ownerId) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const owner = await User.findById(ownerId);
+    if (!owner) return res.status(401).json({ success: false, message: 'Authentication required.' });
+
+    const bid = await NftBid.findById(req.params.bidId);
+    if (!bid) return res.status(404).json({ success: false, message: 'Bid not found.' });
+    if (bid.status !== 'pending') return res.status(422).json({ success: false, message: 'Bid is not pending.' });
+
+    const nft = await Nft.findById(bid.nft_id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+
+    if (String(nft.owner_id) !== String(owner._id)) {
+      return res.status(403).json({ success: false, message: 'Only the current NFT owner can accept bids.' });
+    }
+    if (String(bid.user_id) === String(owner._id)) {
+      return res.status(422).json({ success: false, message: 'Cannot accept your own bid.' });
+    }
+
+    const amountEth = Number(bid.amount_eth || 0);
+    if (!(amountEth > 0)) return res.status(422).json({ success: false, message: 'Invalid bid amount.' });
+
+    const ethUsd = await getEthUsdPrice();
+    if (!(ethUsd > 0)) {
+      return res.status(503).json({
+        success: false,
+        message: 'ETH price unavailable. Ensure Ethereum (ETH) is listed as an asset with a live price.',
+      });
+    }
+    const costUsd = Number((amountEth * ethUsd).toFixed(2));
+    if (!(costUsd > 0)) {
+      return res.status(422).json({ success: false, message: 'Computed transfer amount is zero.' });
+    }
+
+    // Debit bidder first (both balance + account_bal)
+    const bidderAfter = await nftAdjustBalance(bid.user_id, -costUsd);
+    if (!bidderAfter) {
+      const bidder = await User.findById(bid.user_id);
+      const bal = nftUserBalance(bidder);
+      return res.status(422).json({
+        success: false,
+        message: `Bidder has insufficient balance. Need $${costUsd.toFixed(2)} (${amountEth} ETH @ $${ethUsd.toFixed(2)}). Bidder balance: $${bal.toFixed(2)}.`,
+        required_usd: costUsd,
+        eth_usd: ethUsd,
+        bidder_balance: bal,
+      });
+    }
+
+    // Credit current owner (both fields)
+    const ownerAfter = await nftAdjustBalance(owner._id, costUsd);
+    if (!ownerAfter) {
+      // rollback bidder debit
+      await nftAdjustBalance(bid.user_id, costUsd);
+      return res.status(500).json({ success: false, message: 'Failed to credit seller. Transfer rolled back.' });
+    }
+
+    const prevOwnerId = nft.owner_id;
+    const prevOwnerName = nft.owner_name;
+    const bidderName = nftUserName(bidderAfter);
+
+    nft.owner_id = bidderAfter._id;
+    nft.owner_name = bidderName;
+    nft.price_eth = amountEth;
+    nft.status = 'sold';
+    await nft.save();
+
+    bid.status = 'accepted';
+    await bid.save();
+    await NftBid.updateMany(
+      { nft_id: nft._id, status: 'pending', _id: { $ne: bid._id } },
+      { $set: { status: 'rejected' } }
+    );
+
+    await NftTransaction.create({
+      nft_id: nft._id,
+      nft_name: nft.name,
+      from_id: prevOwnerId,
+      to_id: bidderAfter._id,
+      from_name: prevOwnerName,
+      to_name: bidderName,
+      type: 'bid_accept',
+      amount_eth: amountEth,
+      amount_usd: costUsd,
+    });
+
+    try {
+      await Notification.create({
+        user_id: bidderAfter._id,
+        title: 'Bid accepted',
+        message: `The owner accepted your bid of ${amountEth} ETH (≈ $${costUsd.toFixed(2)}) on ${nft.name}. $${costUsd.toFixed(2)} was debited from your balance.`,
+        type: 'nft',
+        link: '/user/nfts-details.html?id=' + nft._id,
+      });
+      await Notification.create({
+        user_id: owner._id,
+        title: 'NFT sold via bid',
+        message: `You accepted a bid of ${amountEth} ETH (≈ $${costUsd.toFixed(2)}) on ${nft.name}. $${costUsd.toFixed(2)} was credited to your balance.`,
+        type: 'nft',
+        link: '/user/nfts-details.html?id=' + nft._id,
+      });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `Bid accepted. $${costUsd.toFixed(2)} debited from bidder and credited to you.`,
+      bid,
+      nft,
+      cost_usd: costUsd,
+      eth_usd: ethUsd,
+      seller_balance: nftUserBalance(ownerAfter),
+      bidder_balance: nftUserBalance(bidderAfter),
+    });
+  } catch (e) {
+    console.error('[nft bid accept]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/nfts/bids/:bidId/reject', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const bid = await NftBid.findById(req.params.bidId);
+    if (!bid) return res.status(404).json({ success: false, message: 'Bid not found.' });
+    if (bid.status !== 'pending') return res.status(422).json({ success: false, message: 'Bid is not pending.' });
+    const nft = await Nft.findById(bid.nft_id);
+    if (!nft) return res.status(404).json({ success: false, message: 'NFT not found.' });
+    if (String(nft.owner_id) !== String(u._id)) {
+      return res.status(403).json({ success: false, message: 'Only the NFT owner can reject bids.' });
+    }
+    bid.status = 'rejected';
+    await bid.save();
+    try {
+      await Notification.create({
+        user_id: bid.user_id,
+        title: 'Bid rejected',
+        message: `Your bid of ${Number(bid.amount_eth || 0)} ETH on ${nft.name} was rejected.`,
+        type: 'nft',
+        link: '/user/nfts-details.html?id=' + nft._id,
+      });
+    } catch (_) {}
+    try {
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      const bidder = await User.findById(bid.user_id);
+      if (bidder) {
+        await sendPushToUser(bidder, {
+          title: 'Bid rejected',
+          body: `Your bid on ${nft.name} was rejected.`,
+          url: '/user/nfts-details.html?id=' + nft._id,
+          tag: 'nft-bid-reject',
+        });
+      }
+    } catch (_) {}
+    return res.json({ success: true, message: 'Bid rejected.', bid });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
   }
 });
 
