@@ -10,6 +10,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { requireAuth, requireAdmin, checkUser } = require('./utils/authMiddleware');
 
+
 const app = express();
 app.set('trust proxy', 1);
 app.use(morgan('dev'));
@@ -101,4 +102,3 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch(err => console.log(err.message));
 
 module.exports = app;
-
