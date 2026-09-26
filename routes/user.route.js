@@ -811,14 +811,8 @@ router.post('/dashboard/mining/stop/:id', async (req, res) => {
   }
 });
 
-// Transfer
-router.post('/dashboard/transfertouser', async (req, res) => {
-  try {
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
-  }
-});
+// Transfer handled via feature/transfer (+ alias below)
+
 
 // Membership
 router.get('/dashboard/courses', (req, res) => {
@@ -2325,38 +2319,41 @@ function featureIntervalMs(v) {
 
 }
 
-function featurePlanMin(p) { return featureNum(p.min_price ?? p.min, 0);
- }
+function featurePlanMin(p) {
+  if (!p) return 0;
+  return featureNum(p.min_price ?? p.min, 0);
+}
 
-function featurePlanMax(p) { return featureNum(p.max_price ?? p.max, 0);
- }
+function featurePlanMax(p) {
+  if (!p) return 0;
+  return featureNum(p.max_price ?? p.max, 0);
+}
 
-function featurePlanRate(p) { return featureNum(p.increment_amount ?? p.return ?? p.max_return ?? p.maxr, 0);
- }
+function featurePlanRate(p) {
+  if (!p) return 0;
+  return featureNum(p.increment_amount ?? p.return ?? p.max_return ?? p.maxr, 0);
+}
 
-function featurePlanIsFixed(p) { return String(p.increment_type || p.t_type || 'Percentage').toLowerCase().includes('fixed');
- }
+function featurePlanIsFixed(p) {
+  if (!p) return false;
+  return String(p.increment_type || p.t_type || 'Percentage').toLowerCase().includes('fixed');
+}
 
 function featurePlanDurationMs(p) {
+  if (!p) return 86400000;
   const exp = String(p.expiration || '').match(/(\d+(?:\.\d+)?)\s*(year|month|week|day|hour|minute)/i);
-
   if (!exp) return featureDurationMs(p.duration);
-
   const n = featureNum(exp[1], 30), u = exp[2].toLowerCase();
-
   const mult = { year:365*86400000, month:30*86400000, week:7*86400000, day:86400000, hour:3600000, minute:60000 }[u];
-
-  return n * mult;
-
+  return (n * (mult || 86400000)) || 86400000;
 }
 
 function featurePlanProjectedProfit(p, amount) {
-  const count = Math.max(1, Math.floor(featurePlanDurationMs(p) / featureIntervalMs(p.increment_interval || p.t_interval)));
-
-  const per = featurePlanIsFixed(p) ? featurePlanRate(p) : amount * featurePlanRate(p) / 100;
-
+  if (!p) return 0;
+  const intervalMs = featureIntervalMs(p.increment_interval || p.t_interval) || 86400000;
+  const count = Math.max(1, Math.floor(featurePlanDurationMs(p) / intervalMs));
+  const per = featurePlanIsFixed(p) ? featurePlanRate(p) : featureNum(amount) * featurePlanRate(p) / 100;
   return Math.max(0, per * count);
-
 }
 
 function featureSafeUser(user) {
@@ -2427,21 +2424,30 @@ async function featureSettleExpiredInvestments(userId) {
     if (!fresh || fresh.expire_date > new Date()) continue;
 
     const p = fresh.plan;
- const earned = Math.min(featurePlanProjectedProfit(p, featureNum(fresh.amount)), featureNum(fresh.profit_earned));
+    if (!p) {
+      // Plan was deleted — expire row without projected profit math
+      await FeatureUserPlans.findOneAndUpdate(
+        { _id: fresh._id, active: 'yes' },
+        { $set: { active: 'expired', closed_at: new Date(), settled_at: new Date(), settlement_type: 'expired_no_plan' } }
+      );
+      continue;
+    }
+    const earned = Math.min(featurePlanProjectedProfit(p, featureNum(fresh.amount)), featureNum(fresh.profit_earned));
 
     const updated = await FeatureUserPlans.findOneAndUpdate({ _id:fresh._id, active:'yes' }, { $set:{ active:'expired', profit_earned:earned, closed_at:new Date(), settled_at:new Date(), settlement_type:'expired' } }, { new:true });
 
     if (!updated) continue;
 
     const user = await User.findById(userId);
- if (!user) continue;
+    if (!user) continue;
 
     const payout = featureNum(updated.amount) + earned;
 
     user.account_bal = featureNum(user.account_bal) + payout;
- await user.save();
+    user.balance = featureNum(user.balance ?? user.account_bal);
+    await user.save();
 
-    await featureNotifyUser(user,'investment','Plan balance added',`Your investment plan balances on(${p.name}) are added to your account.`,'/user/notification.html',{ icon:'bell' });
+    await featureNotifyUser(user,'investment','Plan balance added',`Your investment plan balances on(${p.name || 'plan'}) are added to your account.`,'/user/notification.html',{ icon:'bell' });
 
   }
 }
@@ -4605,6 +4611,489 @@ router.post('/dashboard/feature/nfts/bids/:bidId/reject', async (req, res) => {
     return res.status(500).json({ success: false, message: e.message });
   }
 });
+
+
+
+// ===== Account history / trading history / transfer (feature) =====
+function featureUserIdFilter(uid) {
+  return { $or: [{ user_id: uid }, { user: uid }, { owner: uid }] };
+}
+
+router.get('/dashboard/feature/account-history', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const tab = String(req.query.tab || 'deposits').toLowerCase();
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(50, Math.max(5, Number(req.query.limit || 15)));
+    const skip = (page - 1) * limit;
+    const uid = u._id;
+
+    if (tab === 'deposits') {
+      const [deps, hist] = await Promise.all([
+        Deposit.find(featureUserIdFilter(uid)).sort({ createdAt: -1 }).lean(),
+        AccountHistory.find({
+          user_id: uid,
+          type: { $regex: /deposit|express/i },
+        }).sort({ date: -1, createdAt: -1 }).lean(),
+      ]);
+      const rows = [];
+      for (const d of deps) {
+        rows.push({
+          _id: d._id,
+          amount: Number(d.amount || 0),
+          payment_mode: d.payment_method || d.paymethd_method || d.type || '—',
+          status: String(d.status || 'pending').toLowerCase(),
+          date: d.createdAt || d.date || d.updatedAt,
+          source: 'deposit',
+        });
+      }
+      for (const h of hist) {
+        rows.push({
+          _id: h._id,
+          amount: Number(h.amount || 0),
+          payment_mode: h.narration || h.type || 'Deposit',
+          status: String(h.status || 'processed').toLowerCase(),
+          date: h.date || h.createdAt,
+          source: 'history',
+        });
+      }
+      rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+      const total = rows.length;
+      return res.json({
+        success: true,
+        tab: 'deposits',
+        rows: rows.slice(skip, skip + limit),
+        total,
+        page,
+        pages: Math.max(1, Math.ceil(total / limit)),
+        balance: Number(u.account_bal ?? u.balance ?? 0),
+      });
+    }
+
+    if (tab === 'withdrawals') {
+      const list = await Widthdraw.find(featureUserIdFilter(uid)).sort({ createdAt: -1 }).lean();
+      const rows = list.map((w) => ({
+        _id: w._id,
+        amount: Number(w.amount || w.amount_requested || 0),
+        with_charges: Number(w.amountWithCharges || w.total || w.amount || 0),
+        method: w.method || w.type || w.payment_method || '—',
+        status: String(w.status || 'pending').toLowerCase(),
+        date: w.createdAt || w.date,
+      }));
+      const total = rows.length;
+      return res.json({
+        success: true,
+        tab: 'withdrawals',
+        rows: rows.slice(skip, skip + limit),
+        total,
+        page,
+        pages: Math.max(1, Math.ceil(total / limit)),
+        balance: Number(u.account_bal ?? u.balance ?? 0),
+      });
+    }
+
+    // others — AccountHistory + feature schemas (stock, plans, NFT, real estate, mining, live trades)
+    // exclude card / verify / wallet only
+    const excludeRe = /card|verify|kyc|wallet|connect.?wallet/i;
+    const rows = [];
+    const seen = new Set();
+
+    function pushRow(row) {
+      const key = `${row.source}:${String(row._id)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push(row);
+    }
+
+    // 1) AccountHistory (all types except excluded)
+    try {
+      const list = await AccountHistory.find({ user_id: uid }).sort({ date: -1, createdAt: -1 }).lean();
+      for (const h of list) {
+        if (excludeRe.test(String(h.type || '')) || excludeRe.test(String(h.narration || ''))) continue;
+        pushRow({
+          _id: h._id,
+          amount: Number(h.amount || 0),
+          type: h.type || '—',
+          plan_narration: h.narration || h.type || '—',
+          status: String(h.status || 'processed').toLowerCase(),
+          date: h.date || h.createdAt,
+          source: 'history',
+        });
+      }
+    } catch (e) { console.error('[account-history others] AccountHistory', e.message); }
+
+    // 2) Stock trades
+    try {
+      const StockModel = (typeof FeatureStockTrade !== 'undefined') ? FeatureStockTrade : require('../models/StockTrade');
+      const stocks = await StockModel.find({ user_id: uid }).sort({ createdAt: -1 }).lean();
+      for (const s of stocks) {
+        const side = String(s.type || s.side || 'BUY').toUpperCase();
+        pushRow({
+          _id: s._id,
+          amount: Number(s.total || s.amount || (Number(s.shares || 0) * Number(s.price || 0)) || 0),
+          type: side === 'SELL' ? 'STOCK_SELL' : 'STOCK_BUY',
+          plan_narration: `STOCK: ${s.symbol || s.name || '—'}`,
+          status: 'processed',
+          date: s.createdAt,
+          source: 'stock',
+        });
+      }
+    } catch (e) { console.error('[account-history others] StockTrade', e.message); }
+
+    // 3) Live / binary trades
+    try {
+      const TradeModel = typeof Trade !== 'undefined' ? Trade : (typeof TradeLive !== 'undefined' ? TradeLive : null);
+      if (TradeModel) {
+        const trades = await TradeModel.find({ user_id: uid }).sort({ createdAt: -1 }).lean();
+        for (const tr of trades) {
+          const pnl = Number(tr.profit_loss || 0);
+          let typ = String(tr.result || '').toUpperCase();
+          if (!typ) {
+            if (pnl > 0) typ = 'WIN';
+            else if (pnl < 0) typ = 'LOSS';
+            else typ = String(tr.action || tr.status || 'TRADE').toUpperCase();
+          }
+          pushRow({
+            _id: tr._id,
+            amount: Math.abs(Number(tr.amount || pnl || 0)),
+            type: typ,
+            plan_narration: tr.asset_name || tr.asset_type || 'Trade',
+            status: String(tr.status || 'processed').toLowerCase(),
+            date: tr.settled_at || tr.opened || tr.createdAt,
+            source: 'trade',
+          });
+        }
+      }
+    } catch (e) { console.error('[account-history others] Trade', e.message); }
+
+    // 4) Investment plans (buy-plan)
+    try {
+      const plans = await FeatureUserPlans.find({ user: uid }).populate('plan').sort({ createdAt: -1 }).lean();
+      for (const inv of plans) {
+        const planName = (inv.plan && inv.plan.name) || inv.inv_duration || 'Plan';
+        pushRow({
+          _id: inv._id,
+          amount: Number(inv.amount || 0),
+          type: 'Plan purchase',
+          plan_narration: planName,
+          status: String(inv.active || inv.status || 'processed').toLowerCase() === 'yes' ? 'active' : String(inv.active || inv.status || 'processed').toLowerCase(),
+          date: inv.activated_at || inv.createdAt,
+          source: 'plan',
+        });
+        if (Number(inv.profit_earned) > 0) {
+          pushRow({
+            _id: String(inv._id) + '-roi',
+            amount: Number(inv.profit_earned),
+            type: 'ROI',
+            plan_narration: planName,
+            status: 'processed',
+            date: inv.settled_at || inv.closed_at || inv.updatedAt || inv.createdAt,
+            source: 'plan_roi',
+          });
+        }
+      }
+    } catch (e) { console.error('[account-history others] FeatureUserPlans', e.message); }
+
+    // 5) NFT transactions (buyer or seller)
+    try {
+      const nftTx = await NftTransaction.find({
+        $or: [{ to_id: uid }, { from_id: uid }],
+      }).sort({ createdAt: -1 }).lean();
+      for (const tx of nftTx) {
+        const isBuyer = String(tx.to_id) === String(uid);
+        const typ = isBuyer
+          ? (tx.type === 'bid_accept' ? 'Buy NFT' : (tx.type === 'sale' ? 'Buy NFT' : String(tx.type || 'NFT')))
+          : (tx.type === 'bid_accept' || tx.type === 'sale' ? 'Sell NFT' : String(tx.type || 'NFT'));
+        pushRow({
+          _id: tx._id,
+          amount: Number(tx.amount_usd || 0) || (Number(tx.amount_eth || 0)),
+          type: typ,
+          plan_narration: tx.nft_name || 'NFT',
+          status: 'processed',
+          date: tx.createdAt,
+          source: 'nft',
+        });
+      }
+    } catch (e) { console.error('[account-history others] NftTransaction', e.message); }
+
+    // 6) Real estate investments
+    try {
+      const REI = typeof FeatureRealEstateInvestment !== 'undefined'
+        ? FeatureRealEstateInvestment
+        : require('../models/RealEstateInvestment');
+      const REProp = typeof FeatureRealEstateProperty !== 'undefined'
+        ? FeatureRealEstateProperty
+        : require('../models/RealEstateProperty');
+      const reis = await REI.find({ user_id: uid }).populate('property_id').sort({ createdAt: -1 }).lean();
+      for (const inv of reis) {
+        const propName = (inv.property_id && (inv.property_id.name || inv.property_id.title)) || 'Real Estate';
+        pushRow({
+          _id: inv._id,
+          amount: Number(inv.amount || 0),
+          type: 'Real Estate Investment',
+          plan_narration: propName,
+          status: String(inv.status || 'active').toLowerCase(),
+          date: inv.started_at || inv.createdAt,
+          source: 'real_estate',
+        });
+        if (Number(inv.profit_earned) > 0) {
+          pushRow({
+            _id: String(inv._id) + '-roi',
+            amount: Number(inv.profit_earned),
+            type: 'Real Estate ROI',
+            plan_narration: propName,
+            status: 'processed',
+            date: inv.updatedAt || inv.createdAt,
+            source: 'real_estate_roi',
+          });
+        }
+      }
+    } catch (e) { console.error('[account-history others] RealEstate', e.message); }
+
+    // 7) Mining subscriptions
+    try {
+      const MiningSub = typeof FeatureMiningSubscription !== 'undefined'
+        ? FeatureMiningSubscription
+        : require('../models/MiningSubscription');
+      const mines = await MiningSub.find({ user_id: uid }).populate('mining_plan_id').sort({ createdAt: -1 }).lean();
+      for (const s of mines) {
+        const planName = (s.mining_plan_id && s.mining_plan_id.name) || 'Mining';
+        pushRow({
+          _id: s._id,
+          amount: Number(s.invested_amount || s.amount || 0),
+          type: 'Mining Investment',
+          plan_narration: planName,
+          status: String(s.status || 'active').toLowerCase(),
+          date: s.started_at || s.createdAt,
+          source: 'mining',
+        });
+        if (Number(s.profit_earned || s.accumulated_profit) > 0) {
+          pushRow({
+            _id: String(s._id) + '-roi',
+            amount: Number(s.profit_earned || s.accumulated_profit),
+            type: 'Mining ROI',
+            plan_narration: planName,
+            status: 'processed',
+            date: s.updatedAt || s.createdAt,
+            source: 'mining_roi',
+          });
+        }
+      }
+    } catch (e) { console.error('[account-history others] Mining', e.message); }
+
+    rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const total = rows.length;
+    return res.json({
+      success: true,
+      tab: 'others',
+      rows: rows.slice(skip, skip + limit),
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      balance: Number(u.account_bal ?? u.balance ?? 0),
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/trading-history', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(50, Math.max(5, Number(req.query.limit || 15)));
+    const skip = (page - 1) * limit;
+    const uid = u._id;
+    const rows = [];
+
+    try {
+      const trades = await Trade.find({ user_id: uid }).sort({ opened: -1, createdAt: -1 }).lean();
+      for (const t of trades) {
+        const pnl = Number(t.profit_loss || 0);
+        let typ = String(t.result || t.status || 'TRADE').toUpperCase();
+        if (t.result) typ = String(t.result).toUpperCase();
+        else if (pnl > 0) typ = 'WIN';
+        else if (pnl < 0) typ = 'LOSE';
+        rows.push({
+          _id: t._id,
+          asset: t.asset_name || t.asset_type || 'Trade',
+          amount: Math.abs(Number(t.amount || pnl || 0)),
+          type: typ,
+          date: t.settled_at || t.opened || t.createdAt,
+          source: 'trade',
+        });
+      }
+    } catch (_) {}
+
+    try {
+      const stocks = await (typeof FeatureStockTrade !== 'undefined' ? FeatureStockTrade : require('../models/StockTrade')).find({ user_id: uid }).sort({ createdAt: -1 }).lean();
+      for (const s of stocks) {
+        rows.push({
+          _id: s._id,
+          asset: s.symbol || s.name || 'Stock',
+          amount: Math.abs(Number(s.amount || s.total || s.shares || 0)),
+          type: String(s.side || s.type || s.action || 'STOCK').toUpperCase(),
+          date: s.createdAt,
+          source: 'stock',
+        });
+      }
+    } catch (_) {}
+
+    try {
+      const hist = await AccountHistory.find({
+        user_id: uid,
+        type: { $regex: /roi|bonus|win|loss|lose|profit/i },
+      }).sort({ date: -1, createdAt: -1 }).lean();
+      for (const h of hist) {
+        rows.push({
+          _id: h._id,
+          asset: h.narration || h.type || '—',
+          amount: Math.abs(Number(h.amount || 0)),
+          type: String(h.type || 'ROI').toUpperCase(),
+          date: h.date || h.createdAt,
+          source: 'history',
+        });
+      }
+    } catch (_) {}
+
+    rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+    const total = rows.length;
+    return res.json({
+      success: true,
+      rows: rows.slice(skip, skip + limit),
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      balance: Number(u.account_bal ?? u.balance ?? 0),
+    });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/transfer', async (req, res) => {
+  try {
+    const sender = await featureGetUser(req);
+    if (!sender) return res.status(401).json({ success: false, message: 'Authentication required.' });
+
+    const b = req.body || {};
+    const identifier = String(b.email || b.username || b.recipient || '').toLowerCase().trim();
+    const amount = Number(b.amount || 0);
+    const password = typeof b.password === 'string' ? b.password : '';
+
+    if (!identifier) return res.status(422).json({ success: false, message: 'Recipient email or username is required.' });
+    if (!(amount > 0)) return res.status(422).json({ success: false, message: 'Enter a valid transfer amount.' });
+    if (amount < 50) return res.status(422).json({ success: false, message: 'Minimum transfer is $50.00.' });
+    if (!password) return res.status(422).json({ success: false, message: 'Account password is required.' });
+
+    // password check
+    const senderFull = await User.findById(sender._id).select('+password');
+    if (!senderFull) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const ok = await senderFull.comparePassword(password);
+    if (!ok) return res.status(401).json({ success: false, message: 'Incorrect password.' });
+
+    const receiver = await User.findOne({
+      $or: [{ email: identifier }, { username: identifier }],
+    });
+    if (!receiver) return res.status(404).json({ success: false, message: 'Recipient not found.' });
+    if (String(receiver._id) === String(sender._id)) {
+      return res.status(422).json({ success: false, message: 'You cannot transfer to yourself.' });
+    }
+
+    const bal = Math.max(Number(senderFull.account_bal || 0), Number(senderFull.balance || 0));
+    if (bal < amount) {
+      return res.status(422).json({
+        success: false,
+        message: `Insufficient balance. You have $${bal.toFixed(2)}.`,
+      });
+    }
+
+    // debit sender
+    const newSenderBal = Math.round((bal - amount) * 100) / 100;
+    senderFull.account_bal = newSenderBal;
+    senderFull.balance = newSenderBal;
+    await senderFull.save();
+
+    // credit receiver
+    const rBal = Math.max(Number(receiver.account_bal || 0), Number(receiver.balance || 0));
+    const newRecv = Math.round((rBal + amount) * 100) / 100;
+    receiver.account_bal = newRecv;
+    receiver.balance = newRecv;
+    await receiver.save();
+
+    const recvName = receiver.name || receiver.username || receiver.email;
+    const sendName = senderFull.name || senderFull.username || senderFull.email;
+
+    await AccountHistory.create({
+      user_id: senderFull._id,
+      amount: -amount,
+      type: 'Fund Transfer',
+      narration: `Transferred to ${recvName}`,
+      status: 'processed',
+      date: new Date(),
+    });
+    await AccountHistory.create({
+      user_id: receiver._id,
+      amount: amount,
+      type: 'Fund Transfer',
+      narration: `Received from ${sendName}`,
+      status: 'processed',
+      date: new Date(),
+    });
+
+    try {
+      await Notification.create({
+        user_id: senderFull._id,
+        title: 'Transfer sent',
+        message: `You sent $${amount.toFixed(2)} to ${recvName}.`,
+        type: 'transfer',
+        link: '/user/accounthistory.html',
+      });
+      await Notification.create({
+        user_id: receiver._id,
+        title: 'Transfer received',
+        message: `You received $${amount.toFixed(2)} from ${sendName}.`,
+        type: 'transfer',
+        link: '/user/accounthistory.html',
+      });
+    } catch (_) {}
+
+    try {
+      const { sendPushToUser } = require('../utils/pushNotifications');
+      await sendPushToUser(senderFull, {
+        title: 'Transfer sent',
+        body: `You sent $${amount.toFixed(2)} to ${recvName}.`,
+        url: '/user/accounthistory.html',
+        tag: 'transfer-sent',
+      });
+      await sendPushToUser(receiver, {
+        title: 'Transfer received',
+        body: `You received $${amount.toFixed(2)} from ${sendName}.`,
+        url: '/user/accounthistory.html',
+        tag: 'transfer-recv',
+      });
+    } catch (_) {}
+
+    return res.json({
+      success: true,
+      message: `Transfer successful. $${amount.toFixed(2)} sent to ${recvName}.`,
+      balance: newSenderBal,
+    });
+  } catch (e) {
+    console.error('[transfer]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/transfertouser', async (req, res, next) => {
+  // Compatibility alias → same handler as feature/transfer
+  req.url = '/dashboard/feature/transfer';
+  req.originalUrl = '/user/dashboard/feature/transfer';
+  return router.handle(req, res, next);
+});
+
 
 
 module.exports = router;
