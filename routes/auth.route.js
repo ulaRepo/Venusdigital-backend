@@ -1,14 +1,14 @@
 const router = require('express').Router();
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const { sendMail, isEmailConfigured, FROM_EMAIL: EMAIL_FROM } = require('../utils/email');
 const { validationResult } = require('express-validator');
 const User = require('../models/user.model');
 const { registerValidator } = require('../utils/validators');
 const { createToken, maxAge, JWT_SECRET, requireAuth } = require('../utils/authMiddleware');
 const { getPushConfig, sendPushToUser } = require('../utils/pushNotifications');
-const { sendMail, isEmailConfigured, FROM_EMAIL: EMAIL_FROM } = require('../utils/email');
 
-const FROM_EMAIL = process.env.FROM_EMAIL || 'support@example.com';
+const FROM_EMAIL = process.env.FROM_EMAIL || process.env.BIRD_FROM_EMAIL || 'support@digital-grownt.com';
 const BRAND_WEBSITE_URL = String(process.env.BRAND_WEBSITE_URL || process.env.FRONTEND_URL || '').trim().replace(/\/$/, '');
 const BRAND_LOGO_URL = process.env.BRAND_LOGO_URL || `${String(process.env.FRONTEND_URL || '').replace(/\/$/, '')}/storage/app/public/photos/DjH2X9jdLXAgNMV4LJyhCMJ34SrNFTDSlxA6Qk7I.png`;
 const ACCOUNT_TYPES = new Set(['Binary Option Trading', 'Forex Trading', 'Stock Trading', 'CryptoCurrency Investment', 'NFT Trading']);
@@ -304,12 +304,10 @@ router.post('/register', registerValidator, async (req, res, next) => {
       gender, country: normalizedCountry, currency_code: normalizedCurrency, password, account: accounts,
       balance: 0, account_bal: 0, status: 'active', verificationStatus: 'not_verified', account_verify: 'Not Verified'
     });
-    if (isEmailConfigured()) {
-      try {
-        await sendMail(user.email, 'Welcome to Digital-grownt', welcomeEmailHtml({ name: user.name }));
-      } catch (mailError) {
-        console.error('Welcome email error:', mailError.message);
-      }
+    try {
+      await sendMail(user.email, 'Welcome to Digital-grownt', welcomeEmailHtml({ name: user.name }));
+    } catch (mailError) {
+      console.error('Welcome email error:', mailError.message);
     }
     return res.status(201).json({ success: true, message: 'Registered successfully. Please login.', redirect: frontendUrl() + '/login.html' });
   } catch (error) {
@@ -336,10 +334,11 @@ router.post('/forgot-password', async (req, res, next) => {
     user.resetPasswordToken = crypto.createHash('sha256').update(raw).digest('hex');
     user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
     await user.save({ validateBeforeSave: false });
-    if (!isEmailConfigured()) return res.status(503).json({ success: false, message: 'Email delivery is not configured' });
-
-    const resetUrl = frontendUrl() + '/reset-password.html?token=' + encodeURIComponent(raw) + '&email=' + encodeURIComponent(user.email);
+    const resetUrl = `${frontendUrl()}/reset.html?token=${encodeURIComponent(raw)}&email=${encodeURIComponent(user.email)}`;
     try {
+      if (!isEmailConfigured()) {
+        return res.status(503).json({ success: false, message: 'Email delivery is not configured. Set BIRD_API_KEY and FROM_EMAIL.' });
+      }
       await sendMail(user.email, 'Reset your Digital-grownt password', resetEmailHtml({ name: user.name, resetUrl }));
     } catch (mailError) {
       user.resetPasswordToken = undefined;
