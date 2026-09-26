@@ -5096,4 +5096,226 @@ router.post('/dashboard/transfertouser', async (req, res, next) => {
 
 
 
+
+// ===== Unified Portfolio (all modules) =====
+router.get('/dashboard/feature/portfolio', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const uid = u._id;
+    const balance = Math.max(featureNum(u.account_bal), featureNum(u.balance));
+
+    // Trading
+    let openTrades = [];
+    let recentTrades = [];
+    let tradingInvested = 0, tradingUnrealized = 0, tradingRealized = 0;
+    try {
+      openTrades = await Trade.find({ user_id: uid, status: 'open' }).sort({ opened: -1, createdAt: -1 }).limit(50).lean();
+      tradingInvested = openTrades.reduce((s, t) => s + featureNum(t.amount), 0);
+      recentTrades = await Trade.find({ user_id: uid, status: { $in: ['closed', 'cancelled'] } }).sort({ settled_at: -1, createdAt: -1 }).limit(20).lean();
+      tradingRealized = recentTrades.reduce((s, t) => s + featureNum(t.profit_loss), 0);
+      // also include any closed profit_loss from history if open has pl
+      tradingUnrealized = openTrades.reduce((s, t) => s + featureNum(t.profit_loss), 0);
+    } catch (e) { console.error('[portfolio] trades', e.message); }
+
+    // Investment plans
+    let plans = [];
+    let plansInvested = 0, plansProfit = 0, plansActive = 0;
+    try {
+      plans = await FeatureUserPlans.find({ user: uid }).populate('plan').sort({ createdAt: -1 }).lean();
+      for (const p of plans) {
+        if (String(p.active) === 'yes') {
+          plansActive += 1;
+          plansInvested += featureNum(p.amount);
+        }
+        plansProfit += featureNum(p.profit_earned);
+      }
+    } catch (e) { console.error('[portfolio] plans', e.message); }
+
+    // Copy trading
+    let copyPositions = [];
+    let copyInvested = 0, copyProfit = 0, copyActive = 0;
+    try {
+      copyPositions = await FeatureCopyPosition.find({ user_id: uid }).populate('expert_id').sort({ createdAt: -1 }).lean();
+      for (const c of copyPositions) {
+        if (String(c.status || 'active') === 'active') {
+          copyActive += 1;
+          copyInvested += featureNum(c.invested_amount);
+        }
+        copyProfit += featureNum(c.accumulated_profit);
+      }
+    } catch (e) { console.error('[portfolio] copy', e.message); }
+
+    // Bot trading
+    let botSubs = [];
+    let botInvested = 0, botProfit = 0, botActive = 0;
+    try {
+      botSubs = await FeatureBotSubscription.find({ user_id: uid }).populate('bot_id').sort({ createdAt: -1 }).lean();
+      for (const b of botSubs) {
+        if (String(b.status || 'active') === 'active') {
+          botActive += 1;
+          botInvested += featureNum(b.invested_amount);
+        }
+        botProfit += featureNum(b.current_profit) + featureNum(b.admin_profit_adjustment);
+      }
+    } catch (e) { console.error('[portfolio] bots', e.message); }
+
+    // Stocks
+    let stockPositions = [];
+    let stockInvested = 0, stockValue = 0, stockPl = 0;
+    try {
+      const StockPos = (typeof FeatureStockPosition !== 'undefined')
+        ? FeatureStockPosition
+        : require('../models/StockPosition');
+      stockPositions = await StockPos.find({ user_id: uid, shares: { $gt: 0 } }).lean();
+      const symbols = [...new Set(stockPositions.map(p => p.symbol))];
+      const assets = await FeatureTradingAsset.find({ symbol: { $in: symbols } }).lean();
+      const bySym = Object.fromEntries(assets.map(a => [String(a.symbol).toUpperCase(), a]));
+      stockPositions = stockPositions.map(p => {
+        const a = bySym[String(p.symbol).toUpperCase()] || {};
+        const price = featureNum(a.price || a.last_price || p.avg_cost);
+        const invested = featureNum(p.shares) * featureNum(p.avg_cost);
+        const value = featureNum(p.shares) * price;
+        const pl = value - invested;
+        stockInvested += invested;
+        stockValue += value;
+        stockPl += pl;
+        return {
+          ...p,
+          current_price: price,
+          invested,
+          current_value: value,
+          unrealized_pl: pl,
+        };
+      });
+    } catch (e) { console.error('[portfolio] stocks', e.message); }
+
+    // NFTs
+    let nfts = [];
+    let nftsOwned = 0, nftsListed = 0, nftsValue = 0;
+    try {
+      nfts = await Nft.find({ owner_id: uid }).sort({ updatedAt: -1 }).lean();
+      nftsOwned = nfts.length;
+      nftsListed = nfts.filter(n => String(n.status) === 'available' || n.listed).length;
+      // estimate USD via ETH price
+      let ethUsd = 0;
+      try {
+        const eth = await FeatureTradingAsset.findOne({
+          $or: [{ symbol: /^ETH$/i }, { coingecko_id: 'ethereum' }, { name: /ethereum/i }],
+        }).lean();
+        if (eth) ethUsd = featureNum(eth.price || eth.last_price);
+      } catch (_) {}
+      for (const n of nfts) {
+        nftsValue += featureNum(n.price_eth) * (ethUsd > 0 ? ethUsd : 0);
+      }
+    } catch (e) { console.error('[portfolio] nfts', e.message); }
+
+    // Loans
+    let loans = [];
+    let loansActive = 0, loansOutstanding = 0, loansRepaid = 0;
+    try {
+      const LoanModel = require('../models/Loan');
+      loans = await LoanModel.find({
+        user_id: uid,
+        status: { $in: ['active', 'repaying', 'approved', 'pending'] },
+      }).populate('plan_id').sort({ createdAt: -1 }).lean();
+      for (const l of loans) {
+        const total = featureNum(l.total_repayable || l.approved_amount || l.amount);
+        const repaid = featureNum(l.total_repaid);
+        const outstanding = Math.max(0, total - repaid);
+        if (['active', 'repaying', 'approved'].includes(String(l.status))) {
+          loansActive += 1;
+          loansOutstanding += outstanding;
+        }
+        loansRepaid += repaid;
+        l._outstanding = outstanding;
+        l._progress = total > 0 ? Math.min(100, (repaid / total) * 100) : 0;
+      }
+    } catch (e) { console.error('[portfolio] loans', e.message); }
+
+    const totalInvested = plansInvested + copyInvested + botInvested + stockInvested + tradingInvested;
+    const totalPl = plansProfit + copyProfit + botProfit + stockPl + tradingRealized + tradingUnrealized;
+    const netWorth = balance + stockValue + nftsValue + plansInvested + copyInvested + botInvested + tradingInvested - loansOutstanding;
+
+    const allocation = [
+      { key: 'investments', label: 'Investments', amount: plansInvested },
+      { key: 'stocks', label: 'Stocks', amount: stockInvested },
+      { key: 'copy', label: 'Copy Trading', amount: copyInvested },
+      { key: 'bots', label: 'Bot Trading', amount: botInvested },
+      { key: 'trading', label: 'Trading', amount: tradingInvested },
+      { key: 'nfts', label: 'NFTs', amount: nftsValue },
+    ].filter(a => a.amount > 0);
+    const allocSum = allocation.reduce((s, a) => s + a.amount, 0) || 1;
+    allocation.forEach(a => { a.pct = (a.amount / allocSum) * 100; });
+
+    return res.json({
+      success: true,
+      summary: {
+        net_worth: Math.round(netWorth * 100) / 100,
+        total_invested: Math.round(totalInvested * 100) / 100,
+        total_pl: Math.round(totalPl * 100) / 100,
+        account_balance: Math.round(balance * 100) / 100,
+        outstanding_loans: Math.round(loansOutstanding * 100) / 100,
+        loans_active: loansActive,
+      },
+      allocation,
+      counts: {
+        open_trades: openTrades.length,
+        active_plans: plansActive,
+        copy_positions: copyActive,
+        active_bots: botActive,
+        nfts_owned: nftsOwned,
+      },
+      trading: {
+        invested: tradingInvested,
+        unrealized_pl: tradingUnrealized,
+        realized_pl: tradingRealized,
+        open_positions: openTrades.length,
+        open: openTrades,
+        recent: recentTrades,
+      },
+      investments: {
+        active_plans: plansActive,
+        total_invested: plansInvested,
+        profit_earned: plansProfit,
+        plans,
+      },
+      copy: {
+        active_positions: copyActive,
+        total_invested: copyInvested,
+        accumulated_profit: copyProfit,
+        positions: copyPositions,
+      },
+      bots: {
+        active_bots: botActive,
+        total_invested: botInvested,
+        accumulated_profit: botProfit,
+        subscriptions: botSubs,
+      },
+      stocks: {
+        total_invested: stockInvested,
+        current_value: stockValue,
+        unrealized_pl: stockPl,
+        positions: stockPositions,
+      },
+      nfts: {
+        owned: nftsOwned,
+        listed: nftsListed,
+        estimated_value: Math.round(nftsValue * 100) / 100,
+        items: nfts,
+      },
+      loans: {
+        active_loans: loansActive,
+        outstanding: loansOutstanding,
+        total_repaid: loansRepaid,
+        items: loans,
+      },
+    });
+  } catch (e) {
+    console.error('[portfolio]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
 module.exports = router;
