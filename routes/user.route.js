@@ -1055,9 +1055,33 @@ router.get('/dashboard/portfolio', (req, res) => {
 // Profile
 router.put('/dashboard/updateacct', async (req, res) => {
   try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const b = req.body || {};
+    if (b.name != null) u.name = String(b.name).trim().slice(0, 120);
+    if (b.username != null) {
+      const un = String(b.username).trim().toLowerCase().slice(0, 40);
+      if (un && un !== u.username) {
+        const taken = await User.findOne({ username: un, _id: { $ne: u._id } });
+        if (taken) return res.status(400).json({ success: false, message: 'Username already taken.' });
+        u.username = un;
+      }
+    }
+    if (b.phone != null) u.phone = String(b.phone).trim().slice(0, 30);
+    if (b.country != null) u.country = String(b.country).trim();
+    if (b.currency_code != null) u.currency_code = String(b.currency_code).trim().toUpperCase().slice(0, 8);
+    if (b.gender != null && ['Female','Male','Others'].includes(String(b.gender))) u.gender = b.gender;
+    if (b.address != null) u.address = String(b.address).trim();
+    if (b.state != null) u.state = String(b.state).trim();
+    if (b.zip_code != null) u.zip_code = String(b.zip_code).trim();
+    await u.save();
+    return res.json({ success: true, message: 'Profile updated successfully.', user: {
+      name: u.name, username: u.username, email: u.email, phone: u.phone, country: u.country,
+      currency_code: u.currency_code, gender: u.gender, address: u.address, state: u.state, zip_code: u.zip_code, image: u.image
+    }});
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -1071,17 +1095,37 @@ router.post('/dashboard/profileinfo', async (req, res) => {
 
 router.put('/dashboard/updatepass', async (req, res) => {
   try {
+    const u = await User.findById(featureIdOf(req)).select('+password');
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const current = String(req.body.current_password || req.body.old_password || '');
+    const next = String(req.body.new_password || req.body.password || '');
+    const confirm = String(req.body.confirm_password || req.body.password_confirmation || next);
+    if (!current || !next) return res.status(400).json({ success: false, message: 'Current and new password are required.' });
+    if (next.length < 6) return res.status(400).json({ success: false, message: 'New password must be at least 6 characters.' });
+    if (next !== confirm) return res.status(400).json({ success: false, message: 'Password confirmation does not match.' });
+    const ok = await u.comparePassword(current);
+    if (!ok) return res.status(400).json({ success: false, message: 'Current password is incorrect.' });
+    u.password = next;
+    await u.save();
+    return res.json({ success: true, message: 'Password changed successfully. Please log in again.' });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
-router.post('/dashboard/updateprofileimage', async (req, res) => {
+router.post('/dashboard/updateprofileimage', upload.single('photo'), async (req, res) => {
   try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const url = cloudUrl(req.file) || req.body.image_url || req.body.image;
+    if (!url) return res.status(400).json({ success: false, message: 'Photo file is required.' });
+    u.image = String(url);
+    await u.save();
+    return res.json({ success: true, message: 'Profile photo updated.', image: u.image });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
+    return res.status(500).json({ success: false, message: error.message || 'Server error' });
   }
 });
 
@@ -5313,6 +5357,171 @@ router.get('/dashboard/feature/portfolio', async (req, res) => {
     });
   } catch (e) {
     console.error('[portfolio]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+
+// ===== Account Settings (profile + records) =====
+router.get('/dashboard/feature/account-settings', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const uid = u._id;
+    const balance = Math.max(featureNum(u.account_bal), featureNum(u.balance));
+    const profit = featureNum(u.profit || u.roi);
+    const bonus = featureNum(u.bonus);
+    const refBonus = featureNum(u.ref_bonus);
+
+    let trading = { open: 0, invested: 0, profit: 0, loss: 0, trades: 0 };
+    try {
+      const open = await Trade.find({ user_id: uid, status: 'open' }).lean();
+      const closed = await Trade.find({ user_id: uid, status: { $in: ['closed','cancelled'] } }).lean();
+      trading.open = open.length;
+      trading.invested = open.reduce((s,t)=>s+featureNum(t.amount),0);
+      trading.trades = open.length + closed.length;
+      for (const t of closed) {
+        const pl = featureNum(t.profit_loss);
+        if (pl >= 0) trading.profit += pl; else trading.loss += Math.abs(pl);
+      }
+    } catch (e) { console.error('[acct] trade', e.message); }
+
+    let copy = { active: 0, invested: 0, profit: 0 };
+    try {
+      const rows = await FeatureCopyPosition.find({ user_id: uid }).lean();
+      for (const c of rows) {
+        if (String(c.status||'active')==='active') { copy.active++; copy.invested += featureNum(c.invested_amount); }
+        copy.profit += featureNum(c.accumulated_profit);
+      }
+    } catch (e) { console.error('[acct] copy', e.message); }
+
+    let plans = { active: 0, invested: 0, earned: 0 };
+    try {
+      const rows = await FeatureUserPlans.find({ user: uid }).lean();
+      for (const p of rows) {
+        if (String(p.active)==='yes') { plans.active++; plans.invested += featureNum(p.amount); }
+        plans.earned += featureNum(p.profit_earned);
+      }
+    } catch (e) { console.error('[acct] plans', e.message); }
+
+    let stocks = { positions: 0, invested: 0, value: 0 };
+    try {
+      const StockPos = typeof FeatureStockPosition !== 'undefined' ? FeatureStockPosition : require('../models/StockPosition');
+      const rows = await StockPos.find({ user_id: uid, shares: { $gt: 0 } }).lean();
+      stocks.positions = rows.length;
+      const symbols = [...new Set(rows.map(r=>r.symbol))];
+      const assets = await FeatureTradingAsset.find({ symbol: { $in: symbols } }).lean();
+      const bySym = Object.fromEntries(assets.map(a=>[String(a.symbol).toUpperCase(), a]));
+      for (const p of rows) {
+        const price = featureNum((bySym[String(p.symbol).toUpperCase()]||{}).price || p.avg_cost);
+        stocks.invested += featureNum(p.shares)*featureNum(p.avg_cost);
+        stocks.value += featureNum(p.shares)*price;
+      }
+    } catch (e) { console.error('[acct] stocks', e.message); }
+
+    let nfts = { owned: 0, value: 0 };
+    try {
+      const items = await Nft.find({ owner_id: uid }).lean();
+      nfts.owned = items.length;
+      let ethUsd = 0;
+      try {
+        const eth = await FeatureTradingAsset.findOne({ $or: [{ symbol: /^ETH$/i }, { coingecko_id: 'ethereum' }] }).lean();
+        if (eth) ethUsd = featureNum(eth.price);
+      } catch(_){}
+      for (const n of items) nfts.value += featureNum(n.price_eth) * (ethUsd || 0);
+    } catch (e) { console.error('[acct] nfts', e.message); }
+
+    let deposits = { total: 0, count: 0 };
+    let withdrawals = { total: 0, count: 0 };
+    try {
+      const deps = await Deposit.find({ user: uid, status: { $in: ['Processed','processed','Approved','approved','completed','Completed'] } }).lean().catch(()=>[]);
+      const deps2 = deps.length ? deps : await Deposit.find({ user_id: uid }).lean().catch(()=>[]);
+      for (const d of (deps.length?deps:deps2)) {
+        const st = String(d.status||'').toLowerCase();
+        if (['processed','approved','completed','success'].includes(st) || deps.length) {
+          deposits.total += featureNum(d.amount);
+          deposits.count += 1;
+        }
+      }
+    } catch (e) { console.error('[acct] dep', e.message); }
+    try {
+      const Widthdraw = require('../models/widthdrawSchema');
+      const wds = await Widthdraw.find({ $or: [{ user: uid }, { user_id: uid }] }).lean();
+      for (const w of wds) {
+        const st = String(w.status||'').toLowerCase();
+        if (['processed','approved','completed','paid'].includes(st)) {
+          withdrawals.total += featureNum(w.amount);
+          withdrawals.count += 1;
+        }
+      }
+    } catch (e) {
+      try {
+        const W = require('../models/Withdrawal');
+        const wds = await W.find({ user_id: uid }).lean();
+        for (const w of wds) {
+          withdrawals.total += featureNum(w.amount);
+          withdrawals.count += 1;
+        }
+      } catch (e2) { console.error('[acct] wd', e2.message); }
+    }
+
+    let loans = { active: 0, outstanding: 0, repaid: 0 };
+    try {
+      const LoanModel = require('../models/Loan');
+      const rows = await LoanModel.find({ user_id: uid }).lean();
+      for (const l of rows) {
+        const total = featureNum(l.total_repayable || l.approved_amount || l.amount);
+        const repaid = featureNum(l.total_repaid);
+        if (['active','repaying','approved'].includes(String(l.status))) {
+          loans.active++;
+          loans.outstanding += Math.max(0, total - repaid);
+        }
+        loans.repaid += repaid;
+      }
+    } catch (e) { console.error('[acct] loans', e.message); }
+
+    const totalInvested = copy.invested + plans.invested + stocks.invested + trading.invested;
+    const totalPl = trading.profit - trading.loss + copy.profit + plans.earned + (stocks.value - stocks.invested);
+    const netWorth = balance + stocks.value + nfts.value + plans.invested + copy.invested + trading.invested - loans.outstanding;
+    const winRate = featureNum(u.win_rate);
+    const allocation = [
+      { label: 'Copy Trading', amount: copy.invested },
+      { label: 'Stocks', amount: stocks.invested },
+      { label: 'Investments', amount: plans.invested },
+      { label: 'Trading', amount: trading.invested },
+      { label: 'NFTs', amount: nfts.value },
+    ].filter(a => a.amount > 0);
+
+    const frontend = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    const refLink = u.ref_link || (frontend ? `${frontend}/register.html?ref=${encodeURIComponent(u.username)}` : `/register.html?ref=${encodeURIComponent(u.username)}`);
+
+    return res.json({
+      success: true,
+      profile: {
+        name: u.name, username: u.username, email: u.email, phone: u.phone,
+        country: u.country, currency_code: u.currency_code, gender: u.gender,
+        address: u.address || '', state: u.state || '', zip_code: u.zip_code || '',
+        image: u.image || '',
+        account_verify: u.account_verify || 'Not Verified',
+        verificationStatus: u.verificationStatus || 'not_verified',
+        isVerified: Boolean(u.isVerified),
+        balance, profit, bonus, ref_bonus: refBonus, win_rate: winRate,
+        ref_link: refLink,
+      },
+      records: {
+        net_worth: Math.round(netWorth*100)/100,
+        total_invested: Math.round(totalInvested*100)/100,
+        total_pl: Math.round(totalPl*100)/100,
+        win_rate: winRate,
+        allocation,
+        balance, profit, bonus, referral: refBonus,
+        trading, copy, plans, stocks, nfts, deposits, withdrawals, loans,
+        ref_link: refLink,
+      }
+    });
+  } catch (e) {
+    console.error('[account-settings]', e);
     return res.status(500).json({ success: false, message: e.message });
   }
 });

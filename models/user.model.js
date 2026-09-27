@@ -74,6 +74,9 @@ const userSchema = new mongoose.Schema(
     code5_enabled: { type: Boolean, default: false }, code5_label: { type: String, default: 'Taxation Code' }, code5: { type: String, default: '', maxlength: 4 },
 
     image: { type: String, default: '' },
+    address: { type: String, default: '', trim: true },
+    state: { type: String, default: '', trim: true },
+    zip_code: { type: String, default: '', trim: true },
     resetPasswordToken: { type: String, select: false },
     resetPasswordExpires: { type: Date, select: false },
     pushSubscription: { type: mongoose.Schema.Types.Mixed, default: null },
