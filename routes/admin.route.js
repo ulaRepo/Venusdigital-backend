@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const router = require('express').Router();
 
 const User = require('../models/user.model');
+const SupportTicket = require('../models/SupportTicket');
 const Deposit = require('../models/depositSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Trade = require('../models/livetradingSchema');
@@ -2423,38 +2424,6 @@ router.post('/bot-trading/subscriptions/bulk-settle', async (req, res) => {
 });
 
 // ===================== SUPPORT =====================
-
-router.get('/dashboard/support-tickets', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Use the frontend admin support tickets page',
-    redirect: `${frontendUrl()}/admin/support-tickets.html`
-  });
-});
-
-router.get('/dashboard/support-tickets/:ticket', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Use the frontend admin support ticket details page',
-    redirect: `${frontendUrl()}/admin/support-tickets.html?ticket=${req.params.ticket}`
-  });
-});
-
-router.post('/dashboard/support-tickets/:ticket/reply', async (req, res) => {
-  try {
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
-  }
-});
-
-router.put('/dashboard/support-tickets/:ticket/status', async (req, res) => {
-  try {
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
-  }
-});
 
 // ===================== NFT MODULE =====================
 
@@ -5518,6 +5487,230 @@ router.post('/dashboard/feature/nft-bids/:id/reject', async (req, res) => {
     } catch (_) {}
     return res.json({ success: true, message: 'Bid rejected.', bid });
   } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+
+// ===================== SUPPORT TICKETS (ADMIN) =====================
+router.get('/dashboard/feature/support-tickets', async (req, res) => {
+  try {
+    const status = String(req.query.status || 'all').toLowerCase();
+    const search = String(req.query.search || '').trim();
+    const filter = {};
+    if (status === 'open') filter.status = 'Open';
+    else if (status === 'answered') filter.status = 'Answered';
+    else if (status === 'closed') filter.status = 'Closed';
+    let tickets = await SupportTicket.find(filter).sort({ updatedAt: -1 }).lean();
+    const userIds = [...new Set(tickets.map(t => String(t.user_id)))];
+    const users = await User.find({ _id: { $in: userIds } }).select('name email username').lean();
+    const byId = Object.fromEntries(users.map(u => [String(u._id), u]));
+    if (search) {
+      const s = search.toLowerCase();
+      tickets = tickets.filter(t => {
+        const u = byId[String(t.user_id)] || {};
+        return (
+          String(t.ticket_id).toLowerCase().includes(s) ||
+          String(t.subject).toLowerCase().includes(s) ||
+          String(u.name || '').toLowerCase().includes(s) ||
+          String(u.email || '').toLowerCase().includes(s) ||
+          String(u.username || '').toLowerCase().includes(s)
+        );
+      });
+    }
+    const all = await SupportTicket.find({}).select('status').lean();
+    const stats = {
+      total: all.length,
+      open: all.filter(t => t.status === 'Open').length,
+      answered: all.filter(t => t.status === 'Answered').length,
+      closed: all.filter(t => t.status === 'Closed').length,
+    };
+    const list = tickets.map(t => {
+      const u = byId[String(t.user_id)] || {};
+      return {
+        _id: t._id,
+        ticket_id: t.ticket_id,
+        subject: t.subject,
+        status: t.status,
+        priority: t.priority,
+        updatedAt: t.updatedAt,
+        createdAt: t.createdAt,
+        message_count: (t.messages || []).length,
+        user: { _id: u._id, name: u.name, email: u.email, username: u.username },
+      };
+    });
+    return res.json({ success: true, stats, tickets: list });
+  } catch (e) {
+    console.error('[admin support list]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/support-tickets/:ticket', async (req, res) => {
+  try {
+    const key = String(req.params.ticket || '');
+    const ticket = await SupportTicket.findOne({
+      $or: [{ ticket_id: key }, { _id: key.match(/^[a-f0-9]{24}$/i) ? key : null }].filter(Boolean),
+    }).lean();
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    const user = await User.findById(ticket.user_id).select('name email username phone').lean();
+    return res.json({ success: true, ticket, user });
+  } catch (e) {
+    console.error('[admin support get]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/support-tickets/:ticket/reply', async (req, res) => {
+  try {
+    const key = String(req.params.ticket || '');
+    const body = String(req.body.message || req.body.body || req.body.reply || '').trim();
+    if (!body) return res.status(400).json({ success: false, message: 'Reply is required.' });
+    const ticket = await SupportTicket.findOne({
+      $or: [{ ticket_id: key }, { _id: key.match(/^[a-f0-9]{24}$/i) ? key : null }].filter(Boolean),
+    });
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    if (ticket.status === 'Closed') {
+      return res.status(400).json({ success: false, message: 'Ticket is closed. Reopen it first.' });
+    }
+    const adminUser = req.user || {};
+    ticket.messages.push({
+      sender: 'admin',
+      sender_id: adminUser._id || null,
+      sender_name: adminUser.name || 'Support Team',
+      body,
+    });
+    ticket.status = 'Answered';
+    await ticket.save();
+    try {
+      await notifyUser(
+        ticket.user_id,
+        'support',
+        'Support Reply',
+        `Your ticket #${ticket.ticket_id} has a new reply.`,
+        `/user/support-details.html?ticket=${encodeURIComponent(ticket.ticket_id)}`
+      );
+    } catch (ne) {
+      console.error('[support notify]', ne.message);
+    }
+    return res.json({ success: true, message: 'Reply sent successfully.', ticket });
+  } catch (e) {
+    console.error('[admin support reply]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/dashboard/feature/support-tickets/:ticket/status', async (req, res) => {
+  try {
+    const key = String(req.params.ticket || '');
+    let status = String(req.body.status || '').trim();
+    const map = { open: 'Open', answered: 'Answered', closed: 'Closed', Open: 'Open', Answered: 'Answered', Closed: 'Closed' };
+    status = map[status] || status;
+    if (!['Open', 'Answered', 'Closed'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status.' });
+    }
+    const ticket = await SupportTicket.findOne({
+      $or: [{ ticket_id: key }, { _id: key.match(/^[a-f0-9]{24}$/i) ? key : null }].filter(Boolean),
+    });
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    ticket.status = status;
+    await ticket.save();
+    return res.json({
+      success: true,
+      message: `Ticket status updated to ${status.toLowerCase()}.`,
+      ticket,
+    });
+  } catch (e) {
+    console.error('[admin support status]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+// ===================== EMAIL SERVICES (ADMIN) =====================
+router.get('/dashboard/feature/email-services/users', async (req, res) => {
+  try {
+    const category = String(req.query.category || 'all').toLowerCase();
+    let filter = { role: { $ne: 'ADMIN' } };
+    if (category === 'verified') filter.isVerified = true;
+    else if (category === 'unverified') filter.$or = [{ isVerified: false }, { verificationStatus: 'not_verified' }];
+    else if (category === 'active') filter.status = 'active';
+    else if (category === 'blocked') filter.status = 'blocked';
+    const users = await User.find(filter).select('name email username status isVerified').sort({ name: 1 }).lean();
+    return res.json({ success: true, users });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/email-services/send', async (req, res) => {
+  try {
+    const { sendMail } = require('../utils/email');
+    const category = String(req.body.category || 'all').toLowerCase();
+    const subject = String(req.body.subject || '').trim();
+    const message = String(req.body.message || '').trim();
+    const greeting = String(req.body.greeting || 'Hello').trim();
+    const title = String(req.body.title || 'Investor').trim();
+    const template = String(req.body.template || 'blue').toLowerCase();
+    const singleUserId = req.body.user_id || null;
+    if (!subject || !message) {
+      return res.status(400).json({ success: false, message: 'Subject and message are required.' });
+    }
+    let users = [];
+    if (singleUserId) {
+      const u = await User.findById(singleUserId).select('name email').lean();
+      if (u) users = [u];
+    } else {
+      let filter = { role: { $ne: 'ADMIN' } };
+      if (category === 'verified') filter.isVerified = true;
+      else if (category === 'unverified') filter.$or = [{ isVerified: false }, { verificationStatus: 'not_verified' }];
+      else if (category === 'active') filter.status = 'active';
+      else if (category === 'blocked') filter.status = 'blocked';
+      users = await User.find(filter).select('name email').lean();
+    }
+    users = users.filter(u => u.email);
+    if (!users.length) return res.status(400).json({ success: false, message: 'No recipients found.' });
+
+    const themes = {
+      blue: { bg: '#0f172a', accent: '#3B7BFF', card: '#1e293b' },
+      green: { bg: '#0a1f14', accent: '#00d47c', card: '#14301f' },
+      purple: { bg: '#1a0a2e', accent: '#a855f7', card: '#2d1b4e' },
+    };
+    const th = themes[template] || themes.blue;
+
+    let sent = 0, failed = 0;
+    for (const u of users) {
+      const html = `
+<!DOCTYPE html><html><body style="margin:0;padding:0;background:${th.bg};font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:${th.bg};padding:32px 16px;">
+    <tr><td align="center">
+      <table width="560" style="background:${th.card};border-radius:14px;overflow:hidden;">
+        <tr><td style="background:${th.accent};padding:20px 28px;color:#fff;font-size:18px;font-weight:700;">Digital-grownt</td></tr>
+        <tr><td style="padding:28px;color:#e2e8f0;">
+          <p style="margin:0 0 12px;font-size:16px;">${greeting}, ${u.name || title},</p>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;white-space:pre-wrap;">${message.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+          <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;">— The Digital-grownt Team</p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
+      try {
+        await sendMail(u.email, subject, html);
+        sent++;
+      } catch (err) {
+        console.error('[email-services]', u.email, err.message);
+        failed++;
+      }
+    }
+    return res.json({
+      success: true,
+      message: `Email sent to ${sent} user(s)` + (failed ? ` (${failed} failed)` : ''),
+      sent,
+      failed,
+    });
+  } catch (e) {
+    console.error('[email-services]', e);
     return res.status(500).json({ success: false, message: e.message });
   }
 });

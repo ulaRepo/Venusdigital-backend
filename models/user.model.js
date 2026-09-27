@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, required: [true, 'Phone is required'], trim: true, maxlength: [30, 'Phone is too long'], default: 'Not provided' },
     gender: { type: String, required: [true, 'Gender is required'], enum: { values: ['Female', 'Male', 'Others'], message: 'Invalid gender' }, default: 'Others' },
     country: { type: String, required: [true, 'Country is required'], trim: true, default: 'Not specified' },
-    currency_code: { type: String, required: [true, 'Preferred currency is required'], uppercase: true, trim: true, default: 'USD' },
+    currency_code: { type: String, required: [true, 'Preferred currency is required'], trim: true, default: '$', maxlength: [12, 'Currency symbol is too long'] },
     password: { type: String, required: [true, 'Password is required'], minlength: [6, 'Password must be at least 6 characters'], select: false },
     account: {
       type: [String],

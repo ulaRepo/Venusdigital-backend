@@ -2,6 +2,7 @@ const express = require('express');
 const router = require('express').Router();
 
 const User = require('../models/user.model');
+const SupportTicket = require('../models/SupportTicket');
 const Trade = require('../models/livetradingSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Deposit = require('../models/depositSchema');
@@ -332,46 +333,6 @@ router.get('/dashboard/kyc-form', (req, res) => {
     message: 'Use the frontend kyc form page',
     redirect: `${frontendUrl()}/user/kyc-form.html`
   });
-});
-
-router.get('/dashboard/support', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Use the frontend support page',
-    redirect: `${frontendUrl()}/user/support.html`
-  });
-});
-
-router.get('/dashboard/support/create', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Use the frontend support create page',
-    redirect: `${frontendUrl()}/user/support-create.html`
-  });
-});
-
-router.post('/dashboard/support', async (req, res) => {
-  try {
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
-  }
-});
-
-router.get('/dashboard/support/:ticket', (req, res) => {
-  return res.status(200).json({
-    success: true,
-    message: 'Use the frontend support ticket page',
-    redirect: `${frontendUrl()}/user/support.html?ticket=${req.params.ticket}`
-  });
-});
-
-router.post('/dashboard/support/:ticket/reply', async (req, res) => {
-  try {
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: error.message || 'Server error' });
-  }
 });
 
 router.get('/dashboard/account-settings', (req, res) => {
@@ -1069,7 +1030,11 @@ router.put('/dashboard/updateacct', async (req, res) => {
     }
     if (b.phone != null) u.phone = String(b.phone).trim().slice(0, 30);
     if (b.country != null) u.country = String(b.country).trim();
-    if (b.currency_code != null) u.currency_code = String(b.currency_code).trim().toUpperCase().slice(0, 8);
+    if (b.currency_code != null) {
+      // Preferred currency is stored as the display symbol ($, €, ₦, etc.)
+      const raw = String(b.currency_code).trim();
+      u.currency_code = raw.slice(0, 12);
+    }
     if (b.gender != null && ['Female','Male','Others'].includes(String(b.gender))) u.gender = b.gender;
     if (b.address != null) u.address = String(b.address).trim();
     if (b.state != null) u.state = String(b.state).trim();
@@ -5522,6 +5487,133 @@ router.get('/dashboard/feature/account-settings', async (req, res) => {
     });
   } catch (e) {
     console.error('[account-settings]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+
+
+// ===================== SUPPORT TICKETS (USER) =====================
+function genTicketId() {
+  const hex = Math.random().toString(16).slice(2, 10).toUpperCase();
+  return 'TKT-' + hex;
+}
+
+router.get('/dashboard/feature/support', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const tickets = await SupportTicket.find({ user_id: u._id }).sort({ updatedAt: -1 }).lean();
+    const list = tickets.map((t) => {
+      const msgs = t.messages || [];
+      const last = msgs.length ? msgs[msgs.length - 1] : null;
+      let lastPreview = '';
+      if (last) {
+        const who = last.sender === 'admin' ? 'Admin' : 'You';
+        lastPreview = who + ': ' + String(last.body || '').slice(0, 120);
+      }
+      return {
+        _id: t._id,
+        ticket_id: t.ticket_id,
+        subject: t.subject,
+        priority: t.priority,
+        status: t.status,
+        message_count: msgs.length,
+        last_message: lastPreview,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      };
+    });
+    return res.json({ success: true, tickets: list });
+  } catch (e) {
+    console.error('[support list]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/support', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const subject = String(req.body.subject || '').trim();
+    const message = String(req.body.message || req.body.body || '').trim();
+    const priority = ['Low', 'Medium', 'High'].includes(req.body.priority) ? req.body.priority : 'Medium';
+    if (!subject) return res.status(400).json({ success: false, message: 'Subject is required.' });
+    if (!message) return res.status(400).json({ success: false, message: 'Message is required.' });
+    let ticket_id = genTicketId();
+    for (let i = 0; i < 5; i++) {
+      const exists = await SupportTicket.findOne({ ticket_id }).lean();
+      if (!exists) break;
+      ticket_id = genTicketId();
+    }
+    const ticket = await SupportTicket.create({
+      ticket_id,
+      user_id: u._id,
+      subject,
+      priority,
+      status: 'Open',
+      messages: [{
+        sender: 'user',
+        sender_id: u._id,
+        sender_name: u.name || u.username || 'You',
+        body: message,
+      }],
+    });
+    return res.json({
+      success: true,
+      message: 'Your support ticket has been created successfully!',
+      ticket: { _id: ticket._id, ticket_id: ticket.ticket_id },
+    });
+  } catch (e) {
+    console.error('[support create]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.get('/dashboard/feature/support/:ticket', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const key = String(req.params.ticket || '');
+    const ticket = await SupportTicket.findOne({
+      user_id: u._id,
+      $or: [{ ticket_id: key }, { _id: key.match(/^[a-f0-9]{24}$/i) ? key : null }].filter(Boolean),
+    }).lean();
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    return res.json({ success: true, ticket });
+  } catch (e) {
+    console.error('[support get]', e);
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.post('/dashboard/feature/support/:ticket/reply', async (req, res) => {
+  try {
+    const u = await featureGetUser(req);
+    if (!u) return res.status(401).json({ success: false, message: 'Authentication required.' });
+    const key = String(req.params.ticket || '');
+    const body = String(req.body.message || req.body.body || req.body.reply || '').trim();
+    if (!body) return res.status(400).json({ success: false, message: 'Reply message is required.' });
+    const ticket = await SupportTicket.findOne({
+      user_id: u._id,
+      $or: [{ ticket_id: key }, { _id: key.match(/^[a-f0-9]{24}$/i) ? key : null }].filter(Boolean),
+    });
+    if (!ticket) return res.status(404).json({ success: false, message: 'Ticket not found.' });
+    if (ticket.status === 'Closed') {
+      return res.status(400).json({ success: false, message: 'This ticket has been closed.' });
+    }
+    ticket.messages.push({
+      sender: 'user',
+      sender_id: u._id,
+      sender_name: u.name || u.username || 'You',
+      body,
+    });
+    // User replied again → status Open
+    ticket.status = 'Open';
+    await ticket.save();
+    return res.json({ success: true, message: 'Your reply has been sent.', ticket });
+  } catch (e) {
+    console.error('[support reply]', e);
     return res.status(500).json({ success: false, message: e.message });
   }
 });
