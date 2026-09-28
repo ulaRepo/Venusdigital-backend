@@ -21,12 +21,18 @@ function frontendUrl() {
 }
 
 function cookieOptions(remember) {
+  // Production cross-site (e.g. Netlify → Render): SameSite=None + Secure
+  // Local HTTP: SameSite=lax + Secure=false so the browser actually stores the cookie
   const sameSite = process.env.COOKIE_SAMESITE || (process.env.NODE_ENV === 'production' ? 'none' : 'lax');
+  const secureEnv = process.env.COOKIE_SECURE;
+  const secure = secureEnv != null
+    ? String(secureEnv).toLowerCase() === 'true'
+    : (sameSite === 'none' || process.env.NODE_ENV === 'production');
   return {
     httpOnly: true,
     maxAge: (remember ? maxAge * 7 : maxAge) * 1000,
     sameSite,
-    secure: sameSite === 'none' || process.env.NODE_ENV === 'production',
+    secure,
     path: '/',
   };
 }
@@ -263,8 +269,17 @@ router.post('/login', async (req, res, next) => {
     if (!isMatch) return res.status(401).json({ success: false, message: 'Incorrect password', error: 'Incorrect password' });
 
     const remember = req.body.remember === true || req.body.remember === 'true' || req.body.remember === 'on';
-    res.cookie('jwt', createToken(user._id), cookieOptions(remember));
-    return res.json({ success: true, message: 'Login successful', user: safeUser(user), redirect: user.role === 'ADMIN' ? frontendUrl() + '/admin/manageusers.html' : frontendUrl() + '/user/dashboard.html' });
+    const token = createToken(user._id);
+    res.cookie('jwt', token, cookieOptions(remember));
+    // Also return token so the frontend can send Authorization: Bearer when the cookie
+    // is not attached (cross-origin, SameSite, localhost vs 127.0.0.1, etc.)
+    return res.json({
+      success: true,
+      message: 'Login successful',
+      token,
+      user: safeUser(user),
+      redirect: user.role === 'ADMIN' ? frontendUrl() + '/admin/manageusers.html' : frontendUrl() + '/user/dashboard.html'
+    });
   } catch (error) {
     return next(error);
   }
