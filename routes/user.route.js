@@ -6,6 +6,7 @@ const SupportTicket = require('../models/SupportTicket');
 const Trade = require('../models/livetradingSchema');
 const Widthdraw = require('../models/widthdrawSchema');
 const Deposit = require('../models/depositSchema');
+const PaymentMethod = require('../models/PaymentMethod');
 const AccountHistory = require('../models/AccountHistory');
 const Verify = require('../models/verifySchema');
 // const CopyTrade = require('../models/CopyTrade');
@@ -242,7 +243,44 @@ router.get('/dashboard', async (req, res) => {
     const verifyDoc = await Verify.findOne({ $or: [{ user: req.user._id }, { user_id: req.user._id }] }).sort({ createdAt: -1 }).lean().catch(() => null);
     const data = safeDashboardUser(req.user, verifyDoc);
     const unreadCount = await Notification.countDocuments({ user_id: req.user._id, read_at: null });
-    return res.json({ success: true, user: data, unreadCount });
+
+    // Overview metrics for dashboard Overview tab
+    const uid = req.user._id;
+    let deposited = 0;
+    let withdrawn = 0;
+    let totalTrades = 0;
+    let totalPnl = 0;
+    try {
+      const DepositModel = require('../models/depositSchema');
+      const depFilter = { $or: [{ user: uid }, { user_id: uid }], status: 'processed' };
+      const deps = await DepositModel.find(depFilter).select('amount is_loan_repayment loan_id narration').lean();
+      deposited = deps
+        .filter((d) => !(d.is_loan_repayment || d.loan_id || String(d.narration || '').toLowerCase().includes('loan repay')))
+        .reduce((s, d) => s + Number(d.amount || 0), 0);
+    } catch (e) { console.error('dashboard deposited sum', e.message); }
+    try {
+      const WithdrawModel = require('../models/widthdrawSchema');
+      const wds = await WithdrawModel.find({ $or: [{ user: uid }, { user_id: uid }], status: 'processed' }).select('amount amount_requested').lean();
+      withdrawn = wds.reduce((s, w) => s + Number(w.amount || w.amount_requested || 0), 0);
+    } catch (e) { console.error('dashboard withdrawn sum', e.message); }
+    try {
+      const TradeModel = require('../models/livetradingSchema');
+      const trades = await TradeModel.find({ user_id: uid }).select('profit_loss status').lean();
+      totalTrades = trades.length;
+      totalPnl = trades.reduce((s, t) => s + Number(t.profit_loss || 0), 0);
+    } catch (e) { console.error('dashboard trades sum', e.message); }
+
+    return res.json({
+      success: true,
+      user: data,
+      unreadCount,
+      overview: {
+        total_pnl: totalPnl,
+        deposited,
+        withdrawn,
+        total_trades: totalTrades,
+      },
+    });
   } catch (error) {
     console.error('Dashboard summary error:', error);
     return res.status(500).json({ success: false, message: 'Could not load dashboard' });
@@ -1139,7 +1177,7 @@ router.get('/dashboard/deposit-data', async (req, res) => {
     const processedDeposits = deposits.filter((d) => statusValue(d) === 'processed').reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const pendingDeposits = deposits.filter((d) => statusValue(d) === 'pending').reduce((sum, d) => sum + Number(d.amount || 0), 0);
     const express = history.filter((h) => statusValue(h) === 'processed' && String(h.narration || '').trim().toLowerCase() === 'express deposit').reduce((sum, h) => sum + Number(h.amount || 0), 0);
-    return res.json({ success: true, approved: processedDeposits + express, pending: pendingDeposits, methodCount: 13, deposits: deposits.map((d) => {
+    return res.json({ success: true, approved: processedDeposits + express, pending: pendingDeposits, methodCount: await PaymentMethod.countDocuments({ status: 'active' }), deposits: deposits.map((d) => {
       const match = history.find((h) => String(h.meta?.deposit_id || '') === String(d._id)) || history.find((h) => String(h.narration || '').trim().toLowerCase() === 'express deposit' && Number(h.amount || 0) === Number(d.amount || 0));
       return { ...publicDeposit(d), type: match?.type || d.payment_method || d.paymethd_method || d.type || 'Deposit', narration: d.narration || match?.narration || 'Payment' };
     }), history });
@@ -2542,6 +2580,38 @@ router.get('/dashboard/feature/assets', async (req,res)=>{
 
 });
 
+
+
+/* ---------------- USER: active payment methods + deposit draft ---------------- */
+router.get('/dashboard/feature/payment-methods', async (req, res) => {
+  try {
+    const methods = await PaymentMethod.find({ status: 'active' }).sort({ sort_order: 1, createdAt: 1 }).lean();
+    return res.json({ success: true, methods });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message || 'Failed to load payment methods' });
+  }
+});
+
+router.get('/dashboard/deposit-draft', async (req, res) => {
+  try {
+    const draft = req.session.depositDraft || null;
+    let method = null;
+    if (draft && draft.method) {
+      method = await PaymentMethod.findOne({
+        status: 'active',
+        $or: [
+          { name: new RegExp('^' + String(draft.method).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') },
+          { symbol: new RegExp('^' + String(draft.method).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i') }
+        ]
+      }).lean();
+    }
+    return res.json({ success: true, draft, method });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message || 'Failed to load deposit draft' });
+  }
+});
+
+
 router.get('/dashboard/feature/wallet-settings', async(req,res)=>{ const s=await featureEnsureWalletSettings();
  return res.json({success:true,settings:s});
  });
@@ -2865,9 +2935,22 @@ router.post('/dashboard/feature/trades', async(req,res)=>{
       bal=featureNum(u.demo_balance!=null?u.demo_balance:(u.demo_bal!=null?u.demo_bal:0));
     }
     if(amount>bal) return res.status(422).json({success:false,message:'Insufficient balance.'});
-    const assetId=b.trading_asset_id||b.asset_id;
-    const asset=assetId?await FeatureTradingAsset.findById(assetId):null;
-    if(!asset) return res.status(404).json({success:false,message:'Asset not found.'});
+    const assetId = b.trading_asset_id || b.asset_id;
+    const symbolHint = String(b.symbol || b.asset_symbol || '').trim().toUpperCase();
+    let asset = null;
+    const oidOk = assetId && /^[a-fA-F0-9]{24}$/.test(String(assetId));
+    if (oidOk) {
+      asset = await FeatureTradingAsset.findById(assetId);
+    }
+    if (!asset && symbolHint) {
+      asset = await FeatureTradingAsset.findOne({ symbol: symbolHint, is_active: true });
+    }
+    if (!asset && assetId && !oidOk) {
+      // Non-ObjectId ids (legacy static numbers) are not valid — ask client to reload assets
+      return res.status(422).json({ success: false, message: 'Invalid asset id. Reload the page and select an asset from the server list.' });
+    }
+    if (!asset) return res.status(404).json({ success: false, message: 'Asset not found.' });
+    if (asset.is_active === false) return res.status(422).json({ success: false, message: 'This asset is not available for trading.' });
     const entry=featureNum(asset.price||asset.current_price||b.entry_price);
     const leverage=featureNum(b.leverage,5)||5;
     const duration=featureNum(b.duration||b.duration_minutes,5);
